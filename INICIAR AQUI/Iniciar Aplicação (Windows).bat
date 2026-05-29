@@ -1,10 +1,13 @@
 @echo off
 REM ---------------------------------------------------------------------------
 REM Inicia o Extrator de Radiacao Solar (Windows).
-REM De dois cliques neste arquivo. Na primeira vez cria o ambiente virtual,
+REM De DOIS CLIQUES neste arquivo. Na primeira vez cria o ambiente virtual,
 REM instala as dependencias e abre o app no navegador.
+REM
+REM Como este atalho fica na subpasta "INICIAR AQUI", subimos um nivel (..)
+REM para a pasta-pai do projeto antes de rodar.
 REM ---------------------------------------------------------------------------
-cd /d "%~dp0"
+cd /d "%~dp0.."
 
 if not exist ".venv" (
   echo Criando ambiente virtual ^(.venv^)...

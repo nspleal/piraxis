@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
 # ---------------------------------------------------------------------------
-# Inicia o Extrator de Radiação Solar (Linux/Mac).
-# Dê dois cliques (ou rode ./iniciar.sh). Cria o ambiente virtual na primeira
-# vez, instala as dependências e abre o app no navegador.
+# Inicia o Extrator de Radiação Solar (Mac e Linux).
+# Dê DOIS CLIQUES neste arquivo. Na primeira vez cria o ambiente virtual,
+# instala as dependências e abre o app no navegador.
+#
+# Usamos a extensão .command para que no Mac o duplo clique abra direto.
+# Como este atalho fica na subpasta "INICIAR AQUI", subimos um nível (..)
+# para a pasta-pai do projeto antes de rodar.
 # ---------------------------------------------------------------------------
 set -e
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 
 if [ ! -d ".venv" ]; then
   echo "Criando ambiente virtual (.venv)..."
