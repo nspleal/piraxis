@@ -227,7 +227,30 @@ if extrair:
                 "email_soda": _email_efetivo() if usar_mcclear else "(não aplicável)",
             }
             st.session_state["periodo_arquivo"] = (data_inicio, data_fim, local.nome)
-            st.success("Dados extraídos com sucesso! ✅")
+            st.success(
+                f"Dados extraídos com sucesso! ✅ "
+                f"{len(combinado)} registros para o período solicitado."
+            )
+
+            # Avisa se muitos valores vieram vazios (típico de datas recentes,
+            # cujos dados ainda não foram totalmente processados pelas fontes).
+            colunas_radiacao = [
+                c
+                for c in combinado.columns
+                if c != "timestamp" and pd.api.types.is_numeric_dtype(combinado[c])
+            ]
+            if colunas_radiacao and len(combinado) > 0:
+                frac_vazios = (
+                    combinado[colunas_radiacao].isna().all(axis=1).mean()
+                )
+                if frac_vazios > 0.1:
+                    st.warning(
+                        f"⚠️ Cerca de {frac_vazios:.0%} dos horários do período "
+                        "voltaram **sem dados** das fontes. Isso é comum em datas "
+                        "muito recentes (os dados levam alguns dias para ficar "
+                        "completos). Para uma série completa, experimente um "
+                        "período que termine alguns dias antes de hoje."
+                    )
         except (RuntimeError, ValueError) as exc:
             # Mensagem amigável, sem stack trace cru.
             st.error(f"Não foi possível concluir a extração: {exc}")

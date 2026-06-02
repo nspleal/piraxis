@@ -107,6 +107,8 @@ class NasaPower(FonteRadiacao):
             ) from exc
 
         df = self._parsear_json(resposta.json(), diario=diario)
+        # Garante a grade completa do período (horas faltantes viram NaN).
+        df = self._reindexar_periodo(df, data_inicio, data_fim, passo_temporal)
         df = self._padronizar_colunas(df)
         self._salvar_cache(chave, df)
         return df

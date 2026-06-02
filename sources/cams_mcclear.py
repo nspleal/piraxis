@@ -168,6 +168,8 @@ class CamsMcClear(FonteRadiacao):
             ) from exc
 
         df = self._padronizar_resposta(dados)
+        # Garante a grade completa do período (instantes faltantes viram NaN).
+        df = self._reindexar_periodo(df, data_inicio, data_fim, passo_temporal)
         df = self._padronizar_colunas(df)
         self._salvar_cache(chave, df)
         return df

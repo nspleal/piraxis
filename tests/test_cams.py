@@ -64,10 +64,13 @@ def test_parsing_e_normalizacao_colunas(mock_get_cams):
     for col in ("GHI", "DNI", "DHI", "BNI"):
         assert col in df.columns
 
-    # Timestamp sem fuso (tz removido) e valores convertidos.
-    assert df["timestamp"].iloc[0] == pd.Timestamp("2024-01-01 10:00:00")
-    assert df["GHI"].iloc[0] == 520.0
-    assert df["BNI"].iloc[1] == 560.0  # bhi_clear -> BNI
+    # Pedido de 1 dia em passo horário -> grade completa de 24 linhas.
+    assert len(df) == 24
+
+    # Timestamp sem fuso (tz removido); valores localizados pelo horário.
+    por_hora = df.set_index("timestamp")
+    assert por_hora.loc["2024-01-01 10:00", "GHI"] == 520.0
+    assert por_hora.loc["2024-01-01 11:00", "BNI"] == 560.0  # bhi_clear -> BNI
 
 
 def test_email_invalido_lanca_erro():

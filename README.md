@@ -41,17 +41,14 @@ lugar fácil de achar, por exemplo a Área de Trabalho.
 
 ### 3. Inicie com dois cliques
 
-Abra a pasta **`INICIAR AQUI`** (ela aparece no topo do projeto) e dê **dois
-cliques** no arquivo da sua plataforma:
+Dê **dois cliques** no arquivo de inicialização que fica na **raiz do projeto**:
 
-- **Windows:** **`Iniciar Aplicação (Windows).bat`**
-- **Mac/Linux:** **`Iniciar Aplicação (Mac e Linux).command`**
+- **Windows:** **`INICIAR.bat`** ← é só esse, o único ícone que você precisa.
+- **Mac/Linux:** **`INICIAR (Mac e Linux).command`**
 
-Há também um **`LEIA-ME.txt`** dentro dessa pasta com instruções simples.
-
-Na **primeira vez**, o script cria o ambiente, instala tudo o que é necessário
-(pode demorar alguns minutos) e abre o aplicativo no navegador. Nas próximas
-vezes ele abre direto.
+Na **primeira vez**, ele instala tudo o que é necessário (pode demorar alguns
+minutos — é normal) e abre o aplicativo no navegador. Nas próximas vezes abre
+direto. Para encerrar, feche a janela preta que aparece.
 
 > Se preferir o terminal, os comandos manuais são:
 > ```bash
@@ -66,7 +63,7 @@ vezes ele abre direto.
 
 ## Primeiro uso
 
-1. **Abra a ferramenta** (dois cliques no atalho dentro da pasta `INICIAR AQUI`).
+1. **Abra a ferramenta** (dois cliques no `INICIAR.bat`, na raiz do projeto).
 2. Para usar a **NASA POWER**, não precisa fazer nada: já funciona.
 3. Para usar o **CAMS McClear**, você precisa de uma **conta gratuita** no SoDa:
    - Acesse [soda-pro.com](https://www.soda-pro.com) e **crie sua conta** com seu
@@ -131,7 +128,8 @@ radiacao-solar/
 ├── cache/                   # Cache local (criado em runtime)
 ├── data/                    # Planilhas geradas (criado em runtime)
 ├── tests/                   # Testes pytest (sem rede real)
-├── INICIAR AQUI/            # Atalhos de inicialização por duplo clique + LEIA-ME
+├── INICIAR.bat              # ⭐ Dois cliques aqui para abrir (Windows)
+├── INICIAR (Mac e Linux).command  # Dois cliques aqui (Mac/Linux)
 ├── requirements.txt
 ├── pyproject.toml
 └── README.md

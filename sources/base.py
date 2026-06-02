@@ -33,6 +33,16 @@ logger = logging.getLogger(__name__)
 # Nomes padronizados das colunas de componentes (ordem canônica).
 COMPONENTES_PADRAO: tuple[str, ...] = ("GHI", "DNI", "DHI", "BNI")
 
+# Frequência pandas correspondente a cada passo temporal ISO do projeto.
+# Usada para montar a grade completa de horários do período solicitado.
+FREQ_POR_PASSO: dict[str, str] = {
+    "PT01M": "1min",
+    "PT15M": "15min",
+    "PT01H": "1h",
+    "P01D": "1D",
+    "P01M": "1MS",
+}
+
 
 class FonteRadiacao(ABC):
     """Classe base abstrata para uma fonte de dados de radiação solar."""
@@ -122,3 +132,60 @@ class FonteRadiacao(ABC):
             if c != "timestamp" and c not in COMPONENTES_PADRAO
         ]
         return df[["timestamp", *principais, *auxiliares]]
+
+    @staticmethod
+    def _grade_periodo(
+        data_inicio: date, data_fim: date, passo_temporal: str
+    ) -> pd.DatetimeIndex:
+        """Monta a grade COMPLETA de horários (UTC, sem fuso) do período pedido.
+
+        Garante, por exemplo, que um pedido de 1 dia em passo horário tenha
+        exatamente 24 instantes (00:00 a 23:00), independentemente de quantos a
+        fonte devolveu. As datas são tratadas como dias inteiros: de
+        ``data_inicio`` 00:00 até o fim de ``data_fim``.
+        """
+        freq = FREQ_POR_PASSO.get(passo_temporal, "1h")
+        inicio = pd.Timestamp(data_inicio)
+        if passo_temporal == "P01M":
+            # Mensal: um ponto por mês, alinhado ao início de cada mês.
+            inicio = inicio.to_period("M").to_timestamp()
+            fim = pd.Timestamp(data_fim).to_period("M").to_timestamp()
+            return pd.date_range(start=inicio, end=fim, freq="MS")
+        # Demais passos: cobre dias inteiros (fim exclusivo no dia seguinte).
+        fim = pd.Timestamp(data_fim) + pd.Timedelta(days=1)
+        return pd.date_range(start=inicio, end=fim, freq=freq, inclusive="left")
+
+    def _reindexar_periodo(
+        self,
+        df: pd.DataFrame,
+        data_inicio: date,
+        data_fim: date,
+        passo_temporal: str,
+    ) -> pd.DataFrame:
+        """Encaixa os dados da fonte na grade completa do período.
+
+        Horários que a fonte não trouxe passam a existir como linhas com
+        valores ausentes (NaN), em vez de simplesmente desaparecerem. Assim o
+        número de linhas sempre corresponde ao período solicitado.
+        """
+        if df.empty:
+            return df
+        grade = self._grade_periodo(data_inicio, data_fim, passo_temporal)
+        sem_duplicatas = (
+            df.assign(timestamp=pd.to_datetime(df["timestamp"]))
+            .drop_duplicates(subset="timestamp")
+            .set_index("timestamp")
+            .sort_index()
+        )
+        reindexado = sem_duplicatas.reindex(grade)
+        reindexado.index.name = "timestamp"
+        faltantes = int(reindexado.iloc[:, 0].isna().sum()) if len(grade) else 0
+        if faltantes:
+            logger.info(
+                "[%s] %d de %d instantes do período não vieram da fonte "
+                "(preenchidos como vazios).",
+                self.nome,
+                faltantes,
+                len(grade),
+            )
+        return reindexado.reset_index()
