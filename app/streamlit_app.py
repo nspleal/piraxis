@@ -137,8 +137,9 @@ with st.sidebar:
     passo_temporal = PASSOS_TEMPORAIS[rotulo_passo]
 
     st.subheader("Fontes de dados")
-    usar_mcclear = st.checkbox("CAMS McClear (céu limpo)", value=False)
-    usar_nasa = st.checkbox("NASA POWER (real, com nuvens)", value=True)
+    # CAMS McClear é a fonte principal: já vem marcada por padrão.
+    usar_mcclear = st.checkbox("CAMS McClear (céu limpo)", value=True)
+    usar_nasa = st.checkbox("NASA POWER (real, com nuvens)", value=False)
 
     extrair = st.button("🚀 Extrair dados", type="primary", use_container_width=True)
 
@@ -268,7 +269,11 @@ if "combinado" in st.session_state:
     combinado: pd.DataFrame = st.session_state["combinado"]
 
     st.subheader("Pré-visualização dos dados")
-    st.dataframe(combinado.head(20), use_container_width=True)
+    st.caption(
+        f"Tabela completa com **{len(combinado)}** registros do período "
+        "(role para ver todos). A planilha Excel inclui exatamente estes dados."
+    )
+    st.dataframe(combinado, use_container_width=True, height=420)
 
     # Gráfico Plotly: uma linha por componente/fonte numérico.
     colunas_plot = [
