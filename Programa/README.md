@@ -41,10 +41,15 @@ lugar fácil de achar, por exemplo a Área de Trabalho.
 
 ### 3. Inicie com dois cliques
 
-Dê **dois cliques** no arquivo de inicialização que fica na **raiz do projeto**:
+Ao abrir a pasta do projeto você verá só **duas coisas**: o ícone de início e a
+pasta `Programa` (que guarda todo o funcionamento interno — você **não precisa**
+entrar nela).
 
-- **Windows:** **`INICIAR.bat`** ← é só esse, o único ícone que você precisa.
-- **Mac/Linux:** **`INICIAR (Mac e Linux).command`**
+Dê **dois cliques** no ícone de início:
+
+- **Windows:** **`INICIAR EXTRATOR DE RADIAÇÃO.bat`** ← é só esse, o único ícone.
+- **Mac/Linux:** abra a pasta `Programa` e dê dois cliques em
+  **`INICIAR (Mac e Linux).command`**.
 
 Na **primeira vez**, ele instala tudo o que é necessário (pode demorar alguns
 minutos — é normal) e abre o aplicativo no navegador. Nas próximas vezes abre
@@ -63,7 +68,7 @@ direto. Para encerrar, feche a janela preta que aparece.
 
 ## Primeiro uso
 
-1. **Abra a ferramenta** (dois cliques no `INICIAR.bat`, na raiz do projeto).
+1. **Abra a ferramenta** (dois cliques no `INICIAR EXTRATOR DE RADIAÇÃO.bat`).
 2. Para usar a **NASA POWER**, não precisa fazer nada: já funciona.
 3. Para usar o **CAMS McClear**, você precisa de uma **conta gratuita** no SoDa:
    - Acesse [soda-pro.com](https://www.soda-pro.com) e **crie sua conta** com seu
@@ -114,25 +119,26 @@ O arquivo `radiacao_<local>_<inicio>_<fim>.xlsx` é salvo na pasta `data/` e tem
 ## Estrutura do projeto
 
 ```
-radiacao-solar/
-├── app/streamlit_app.py     # Interface (ponto de entrada do usuário)
-├── core/
-│   ├── config.py            # Constantes, Local, Botucatu, caminhos
-│   ├── credenciais.py       # E-mail SoDa por máquina
-│   └── combinador.py        # Combina McClear + NASA e calcula kt
-├── sources/
-│   ├── base.py              # Interface FonteRadiacao + cache
-│   ├── cams_mcclear.py      # Cliente CAMS McClear (SoDa)
-│   └── nasa_power.py        # Cliente NASA POWER
-├── output/exporta_excel.py  # Gera a planilha Excel formatada
-├── cache/                   # Cache local (criado em runtime)
-├── data/                    # Planilhas geradas (criado em runtime)
-├── tests/                   # Testes pytest (sem rede real)
-├── INICIAR.bat              # ⭐ Dois cliques aqui para abrir (Windows)
-├── INICIAR (Mac e Linux).command  # Dois cliques aqui (Mac/Linux)
-├── requirements.txt
-├── pyproject.toml
-└── README.md
+Pasta-do-projeto/
+├── INICIAR EXTRATOR DE RADIAÇÃO.bat   # ⭐ O único ícone: dois cliques aqui (Windows)
+└── Programa/                          # Todo o funcionamento interno (não precisa entrar)
+    ├── app/streamlit_app.py     # Interface (ponto de entrada do usuário)
+    ├── core/
+    │   ├── config.py            # Constantes, Local, Botucatu, caminhos
+    │   ├── credenciais.py       # E-mail SoDa por máquina
+    │   └── combinador.py        # Combina McClear + NASA e calcula kt
+    ├── sources/
+    │   ├── base.py              # Interface FonteRadiacao + cache + grade do período
+    │   ├── cams_mcclear.py      # Cliente CAMS McClear (via pvlib)
+    │   └── nasa_power.py        # Cliente NASA POWER
+    ├── output/exporta_excel.py  # Gera a planilha Excel formatada
+    ├── cache/                   # Cache local (criado em runtime)
+    ├── data/                    # Planilhas geradas (criado em runtime)
+    ├── tests/                   # Testes pytest (sem rede real)
+    ├── INICIAR (Mac e Linux).command  # Início para Mac/Linux
+    ├── requirements.txt
+    ├── pyproject.toml
+    └── README.md
 ```
 
 A arquitetura de fontes é **extensível**: para adicionar uma nova fonte no futuro,
