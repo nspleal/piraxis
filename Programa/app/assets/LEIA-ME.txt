@@ -1,0 +1,29 @@
+==============================================================
+  BRASÃO OFICIAL DA UNESP — COMO INSERIR
+==============================================================
+
+O cabeçalho do aplicativo mostra um espaço para o brasão oficial
+da UNESP. Enquanto não houver a imagem, aparece um quadrinho
+cinza escrito "Logo UNESP" (placeholder) — o programa NÃO quebra
+sem o logo.
+
+PARA EXIBIR O BRASÃO OFICIAL:
+--------------------------------------------------------------
+1. Obtenha o arquivo do brasão por um canal OFICIAL:
+   - Assessoria de Comunicação e Imprensa (ACI) da UNESP; ou
+   - a sua unidade (ex.: FCA - Botucatu).
+
+2. Salve a imagem nesta MESMA pasta (app/assets/) com o nome
+   exato:
+        logo_unesp.png
+
+3. Abra o programa novamente. O brasão aparecerá no cabeçalho
+   automaticamente.
+
+IMPORTANTE:
+--------------------------------------------------------------
+- Use SOMENTE a versão oficial fornecida pela universidade.
+- Versões baixadas de sites/fontes não oficiais violam o
+  Manual de Identidade Visual da UNESP e não devem ser usadas.
+- Formato recomendado: PNG com fundo transparente.
+==============================================================

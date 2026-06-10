@@ -5,12 +5,17 @@ app/streamlit_app.py
 Interface visual (Streamlit) do Extrator de Radiação Solar — ponto de entrada
 do pesquisador. Tudo em português.
 
+Estilo: acadêmico sóbrio (azul institucional UNESP, cinzas neutros, âmbar como
+detalhe nos dados de radiação). Esta camada cuida apenas da APRESENTAÇÃO — a
+lógica de extração/combinação/exportação vem dos módulos core/, sources/ e
+output/ e não é alterada aqui.
+
 Fluxo:
-  1. Título e descrição curtos.
+  1. Cabeçalho institucional (logo + título).
   2. Assistente de primeira configuração do e-mail SoDa (só se necessário).
   3. Barra lateral: e-mail SoDa (editável), local, período, passo, fontes.
   4. Botão "Extrair dados" com spinner e barra de progresso.
-  5. Pré-visualização (tabela + gráfico Plotly).
+  5. Resultados: cards de métricas + gráficos Plotly + tabela.
   6. Botão "Baixar Excel".
   7. Tratamento de erros amigável (sem stack trace cru).
 
@@ -32,7 +37,7 @@ if str(RAIZ) not in sys.path:
     sys.path.insert(0, str(RAIZ))
 
 import pandas as pd
-import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
 
 from core import credenciais
@@ -47,17 +52,151 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 
-st.set_page_config(page_title="Extrator de Radiação Solar — UNESP", page_icon="☀️")
-
-
-# ---------------------------------------------------------------------------
-# 1. Título e descrição
-# ---------------------------------------------------------------------------
-st.title("☀️ Extrator de Radiação Solar")
-st.caption(
-    "Ferramenta local da UNESP para extrair, comparar e exportar dados de "
-    "radiação solar (CAMS McClear + NASA POWER) para uma planilha Excel."
+st.set_page_config(
+    page_title="Extrator de Radiação Solar — UNESP",
+    page_icon="☀️",
+    layout="centered",
 )
+
+# ---------------------------------------------------------------------------
+# Paleta institucional e helpers de apresentação
+# ---------------------------------------------------------------------------
+# Azul institucional (primária). Ponto de partida sóbrio; troque aqui pelo azul
+# oficial da UNESP quando disponível (manual de identidade: Pantone 2758 C).
+AZUL = "#1F4E79"
+# Âmbar/dourado: detalhe "solar", usado com parcimônia nos dados de radiação.
+AMBAR = "#E8A33D"
+CINZA_GRADE = "#E0E0E0"
+CINZA_TEXTO = "#1A1A1A"
+
+# Pasta de imagens (logo opcional).
+ASSETS_DIR = Path(__file__).resolve().parent / "assets"
+LOGO_UNESP = ASSETS_DIR / "logo_unesp.png"
+
+
+def _fmt_num(valor: float, casas: int = 0) -> str:
+    """Formata número no padrão brasileiro (1.234,5)."""
+    if valor is None or (isinstance(valor, float) and pd.isna(valor)):
+        return "—"
+    s = f"{valor:,.{casas}f}"
+    return s.replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def _layout_padrao(fig: go.Figure, titulo: str, ylab: str = "Radiação (Wh/m²)") -> go.Figure:
+    """Aplica o layout visual padrão (sóbrio, claro) a um gráfico Plotly."""
+    fig.update_layout(
+        title=dict(text=titulo, font=dict(size=18, color=AZUL)),
+        template="plotly_white",
+        font=dict(family="sans-serif", color=CINZA_TEXTO),
+        xaxis=dict(title="Tempo", gridcolor=CINZA_GRADE),
+        yaxis=dict(title=ylab, gridcolor=CINZA_GRADE),
+        legend=dict(
+            orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1
+        ),
+        margin=dict(l=10, r=10, t=70, b=10),
+        hovermode="x unified",
+        plot_bgcolor="white",
+        paper_bgcolor="white",
+    )
+    return fig
+
+
+def _serie_ghi(df: pd.DataFrame) -> pd.Series | None:
+    """Encontra a coluna de GHI mais representativa para as métricas."""
+    for c in ("GHI", "GHI_NASA", "GHI_McClear"):
+        if c in df.columns:
+            return df[c]
+    return None
+
+
+def _tem_duas_fontes(df: pd.DataFrame) -> bool:
+    """Indica se o DataFrame combinado traz McClear e NASA lado a lado."""
+    return "GHI_McClear" in df.columns and "GHI_NASA" in df.columns
+
+
+def _figura_series(df: pd.DataFrame) -> go.Figure:
+    """Curva de radiação ao longo do tempo (uma linha por série)."""
+    fig = go.Figure()
+    if _tem_duas_fontes(df):
+        fig.add_trace(
+            go.Scatter(
+                x=df["timestamp"], y=df["GHI_McClear"],
+                name="GHI céu limpo (McClear)",
+                line=dict(color=AZUL, width=2.5),
+            )
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=df["timestamp"], y=df["GHI_NASA"],
+                name="GHI real (NASA)",
+                line=dict(color=AMBAR, width=2.5),
+            )
+        )
+    else:
+        cores = {"GHI": AZUL, "DNI": AMBAR, "DHI": "#6B8FB5", "BNI": "#C8822E"}
+        for comp in ("GHI", "DNI", "DHI", "BNI"):
+            if comp in df.columns:
+                fig.add_trace(
+                    go.Scatter(
+                        x=df["timestamp"], y=df[comp], name=comp,
+                        line=dict(color=cores.get(comp), width=2),
+                    )
+                )
+    return _layout_padrao(fig, "Radiação ao longo do tempo")
+
+
+def _figura_area_nuvens(df: pd.DataFrame) -> go.Figure:
+    """Área entre céu limpo (McClear) e real (NASA): perda por nuvens."""
+    fig = go.Figure()
+    # Linha superior: céu limpo (referência teórica).
+    fig.add_trace(
+        go.Scatter(
+            x=df["timestamp"], y=df["GHI_McClear"],
+            name="Céu limpo (McClear)",
+            line=dict(color=AZUL, width=2),
+        )
+    )
+    # Linha inferior: real; preenche a área entre ela e a anterior (âmbar).
+    fig.add_trace(
+        go.Scatter(
+            x=df["timestamp"], y=df["GHI_NASA"],
+            name="Real (NASA)",
+            line=dict(color=AMBAR, width=2),
+            fill="tonexty",
+            fillcolor="rgba(232, 163, 61, 0.25)",
+        )
+    )
+    return _layout_padrao(fig, "Efeito das nuvens (radiação perdida)")
+
+
+def _cabecalho() -> None:
+    """Cabeçalho institucional: logo (ou placeholder) + título + subtítulo."""
+    col_logo, col_titulo = st.columns([1, 4], vertical_alignment="center")
+    with col_logo:
+        if LOGO_UNESP.exists():
+            st.image(str(LOGO_UNESP), use_container_width=True)
+        else:
+            # Placeholder discreto — nunca quebra se o logo não existir.
+            st.markdown(
+                "<div style='border:1px dashed #B7C2D0;border-radius:8px;"
+                "padding:18px 6px;text-align:center;color:#7A8699;"
+                "background:#F2F5F9;font-size:0.78rem;line-height:1.2;'>"
+                "Logo<br>UNESP</div>",
+                unsafe_allow_html=True,
+            )
+    with col_titulo:
+        st.markdown("## ☀️ Extrator de Radiação Solar")
+        st.caption(
+            "Ferramenta acadêmica da UNESP para extração e análise de radiação "
+            "solar — CAMS McClear (céu limpo) & NASA POWER (real)."
+        )
+
+
+# ---------------------------------------------------------------------------
+# 1. Cabeçalho
+# ---------------------------------------------------------------------------
+_cabecalho()
+st.divider()
 
 # Data limite (hoje - 2 dias) por causa da defasagem do McClear.
 LIMITE_DATA = date.today() - timedelta(days=ATRASO_DIAS)
@@ -96,9 +235,9 @@ if not email_salvo:
 # 3. Barra lateral
 # ---------------------------------------------------------------------------
 with st.sidebar:
-    st.header("Configurações")
+    st.header("⚙️ Configurações")
 
-    st.subheader("Conta SoDa (CAMS McClear)")
+    st.subheader("🔑 Conta SoDa (CAMS McClear)")
     email_sessao = st.text_input(
         "E-mail SoDa",
         value=email_salvo or "",
@@ -111,7 +250,7 @@ with st.sidebar:
         except ValueError as exc:
             st.error(str(exc))
 
-    st.subheader("Local de estudo")
+    st.subheader("📍 Local de estudo")
     nome_local = st.text_input("Nome", value=BOTUCATU.nome)
     latitude = st.number_input(
         "Latitude", value=BOTUCATU.latitude, min_value=-90.0, max_value=90.0,
@@ -123,7 +262,7 @@ with st.sidebar:
     )
     altitude = st.number_input("Altitude (m)", value=BOTUCATU.altitude, format="%.1f")
 
-    st.subheader("Período")
+    st.subheader("📅 Período")
     data_inicio = st.date_input(
         "Data início", value=LIMITE_DATA - timedelta(days=1), max_value=LIMITE_DATA
     )
@@ -132,11 +271,11 @@ with st.sidebar:
     )
     st.caption(f"Limite de data: {LIMITE_DATA:%d/%m/%Y} (hoje − {ATRASO_DIAS} dias).")
 
-    st.subheader("Passo temporal")
-    rotulo_passo = st.selectbox("Resolução", list(PASSOS_TEMPORAIS.keys()), index=2)
+    st.subheader("⏱️ Resolução")
+    rotulo_passo = st.selectbox("Passo temporal", list(PASSOS_TEMPORAIS.keys()), index=2)
     passo_temporal = PASSOS_TEMPORAIS[rotulo_passo]
 
-    st.subheader("Fontes de dados")
+    st.subheader("🛰️ Fontes de dados")
     # CAMS McClear é a fonte principal: já vem marcada por padrão.
     usar_mcclear = st.checkbox("CAMS McClear (céu limpo)", value=True)
     usar_nasa = st.checkbox("NASA POWER (real, com nuvens)", value=False)
@@ -187,7 +326,7 @@ if extrair:
         feitas = 0
 
         try:
-            with st.spinner("Coletando dados das fontes selecionadas…"):
+            with st.spinner("Consultando fontes de radiação…"):
                 if usar_nasa:
                     progresso.progress(
                         feitas / n_fontes, text="Consultando NASA POWER…"
@@ -229,8 +368,8 @@ if extrair:
             }
             st.session_state["periodo_arquivo"] = (data_inicio, data_fim, local.nome)
             st.success(
-                f"Dados extraídos com sucesso! ✅ "
-                f"{len(combinado)} registros para o período solicitado."
+                f"✓ Extração concluída: {len(combinado)} registros de "
+                f"{data_inicio:%d/%m/%Y} a {data_fim:%d/%m/%Y}."
             )
 
             # Avisa se muitos valores vieram vazios (típico de datas recentes,
@@ -263,43 +402,65 @@ if extrair:
 
 
 # ---------------------------------------------------------------------------
-# 5. Pré-visualização e 6. Download
+# 5. Resultados: métricas, gráficos, tabela e 6. Download
 # ---------------------------------------------------------------------------
 if "combinado" in st.session_state:
     combinado: pd.DataFrame = st.session_state["combinado"]
 
-    st.subheader("Pré-visualização dos dados")
+    st.divider()
+    st.subheader("📊 Resumo do período")
+
+    # --- Cards de métricas -------------------------------------------------
+    cards: list[tuple[str, str]] = []
+    ghi = _serie_ghi(combinado)
+    if ghi is not None and ghi.notna().any():
+        cards.append(("Radiação média (GHI)", f"{_fmt_num(ghi.mean(), 1)} Wh/m²"))
+        cards.append(("Pico de radiação (GHI máx.)", f"{_fmt_num(ghi.max(), 1)} Wh/m²"))
+    if "kt" in combinado.columns and combinado["kt"].notna().any():
+        cards.append(
+            ("Índice de claridade médio (kt)", _fmt_num(combinado["kt"].mean(), 2))
+        )
+    cards.append(("Registros extraídos", _fmt_num(len(combinado), 0)))
+
+    for coluna, (rotulo, valor) in zip(st.columns(len(cards)), cards):
+        coluna.metric(rotulo, valor)
+
+    # --- Gráficos ----------------------------------------------------------
+    st.divider()
+    tem_serie = any(
+        c in combinado.columns
+        for c in ("GHI", "DNI", "DHI", "BNI", "GHI_McClear", "GHI_NASA")
+    )
+    if tem_serie:
+        st.plotly_chart(_figura_series(combinado), use_container_width=True)
+
+    if _tem_duas_fontes(combinado):
+        st.plotly_chart(_figura_area_nuvens(combinado), use_container_width=True)
+        st.caption(
+            "A área âmbar mostra a radiação **perdida por causa das nuvens** — a "
+            "diferença entre o céu limpo teórico (McClear) e o real (NASA)."
+        )
+
+    # --- Tabela completa ---------------------------------------------------
+    st.divider()
+    st.subheader("🔢 Dados detalhados")
     st.caption(
         f"Tabela completa com **{len(combinado)}** registros do período "
         "(role para ver todos). A planilha Excel inclui exatamente estes dados."
     )
     st.dataframe(combinado, use_container_width=True, height=420)
 
-    # Gráfico Plotly: uma linha por componente/fonte numérico.
-    colunas_plot = [
-        c
-        for c in combinado.columns
-        if c != "timestamp" and pd.api.types.is_numeric_dtype(combinado[c])
-    ]
-    if colunas_plot:
-        fig = px.line(
-            combinado,
-            x="timestamp",
-            y=colunas_plot,
-            labels={"value": "Radiação (Wh/m²)", "timestamp": "Tempo", "variable": "Série"},
-            title="Radiação ao longo do tempo",
-        )
-        st.plotly_chart(fig, use_container_width=True)
-
-    st.subheader("Exportar")
-    if st.button("📊 Baixar Excel"):
+    # --- Download ----------------------------------------------------------
+    st.divider()
+    st.subheader("⬇️ Exportar para Excel")
+    if st.button("📊 Gerar planilha"):
         try:
             data_ini, data_f, nome_loc = st.session_state["periodo_arquivo"]
             caminho = nome_arquivo_saida(nome_loc, data_ini, data_f)
             exporta(combinado, st.session_state["metadados"], caminho)
             with open(caminho, "rb") as fh:
                 st.download_button(
-                    "⬇️ Clique para baixar a planilha",
+                    "Clique para baixar a planilha",
                     data=fh.read(),
                     file_name=caminho.name,
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -307,3 +468,13 @@ if "combinado" in st.session_state:
             st.success(f"Planilha gerada: {caminho.name}")
         except Exception as exc:  # pragma: no cover
             st.error(f"Não foi possível gerar a planilha: {exc}")
+
+
+# ---------------------------------------------------------------------------
+# Rodapé
+# ---------------------------------------------------------------------------
+st.divider()
+st.caption(
+    f"Extrator de Radiação Solar · Ferramenta acadêmica da UNESP · "
+    f"{date.today().year}"
+)
