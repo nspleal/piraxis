@@ -5,3 +5,8 @@ backgroundColor = "#FFFFFF"
 secondaryBackgroundColor = "#F2F5F9"   # cinza-azulado claro (barra lateral, cards)
 textColor = "#1A1A1A"
 font = "sans serif"
+
+[client]
+toolbarMode = "minimal"        # esconde o botão "Deploy" e reduz o menu do Streamlit
+showSidebarNavigation = false
+

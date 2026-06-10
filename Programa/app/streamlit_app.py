@@ -55,7 +55,22 @@ logging.basicConfig(
 st.set_page_config(
     page_title="Extrator de Radiação Solar — UNESP",
     page_icon="☀️",
-    layout="centered",
+    layout="wide",
+)
+
+# O app é LOCAL (nunca publicado na web): escondemos o botão "Deploy", o menu
+# nativo e o rodapé do Streamlit, que só distraem o pesquisador. O config.toml
+# (toolbarMode="minimal") já remove o Deploy; este CSS é reforço.
+st.markdown(
+    """
+    <style>
+    [data-testid="stToolbar"] {visibility: hidden;}
+    [data-testid="stDecoration"] {display: none;}
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    </style>
+    """,
+    unsafe_allow_html=True,
 )
 
 # ---------------------------------------------------------------------------
