@@ -2,22 +2,37 @@
 sources/cams_mcclear.py
 =======================
 
-Cliente do CAMS McClear (serviço SoDa) — fonte primária, com radiação em
-CÉU LIMPO (sem nuvens), o "teto teórico" da radiação possível no ponto.
+Cliente do CAMS (serviço SoDa) — fonte primária de radiação em CÉU LIMPO
+(McClear), o "teto teórico" da radiação possível no ponto.
 
-A partir da correção, o acesso ao SoDa é feito pela biblioteca **pvlib**
-(``pvlib.iotools.get_cams``), a função oficial, testada e mantida pela
-comunidade de energia solar. Isso resolve o erro 404 (a montagem manual da URL
-usava o endpoint e o formato de parâmetros errados) e dá credibilidade
-acadêmica ao projeto, pois pvlib é a biblioteca-padrão da área.
+O acesso ao SoDa é feito pela biblioteca **pvlib** (``pvlib.iotools.get_cams``),
+a função oficial, testada e mantida pela comunidade de energia solar. Isso
+resolve o antigo erro 404 (a montagem manual da requisição usava o endpoint e
+os nomes de campo errados; o correto, ``api.soda-solardata.com``, é encapsulado
+pela pvlib) e dá credibilidade acadêmica ao projeto. Não há mais montagem
+manual de URL, codificação de e-mail, parâmetros de requisição nem parsing de
+CSV — tudo isso vive dentro da pvlib.
 
 Características do serviço (decisões já tomadas no projeto):
   - Autenticação pelo e-mail cadastrado E CONFIRMADO em soda-pro.com (não há
     chave de API). O e-mail é recebido no construtor, nunca de constante global.
   - Cobertura mundial -> cobre_local sempre True.
   - Componentes retornados: GHI, DNI, DHI, BNI.
-  - Atraso dos dados: sempre current_day - 2 (dois dias de defasagem).
-  - Limite de 100 requisições por dia por conta.
+  - Atraso dos dados: a última data disponível é sempre hoje - 2 dias.
+  - Limite de 100 requisições por dia por conta (por isso o cache-first).
+
+Sobre ``identifier``:
+  - ``"mcclear"`` (padrão): só céu limpo. É o usado pela interface.
+  - ``"cams_radiation"``: além do céu limpo, traz radiação real e
+    ``Reliability``. Cobertura de Botucatu confirmada. Fica EXPOSTO no cliente
+    para uso futuro, mas ainda NÃO é integrado à interface (decisão do
+    orientador pendente).
+
+Sobre o cache e a divisão de períodos:
+  - A ``get_cams`` aceita períodos longos (até anos) numa única chamada, então
+    o cliente NÃO divide o período em blocos. O cache é organizado por período
+    inteiro (hash de local + datas + passo + identifier), gravado após o
+    primeiro download e lido em qualquer repetição idêntica.
 """
 
 from __future__ import annotations
@@ -26,14 +41,18 @@ import logging
 from datetime import date, timedelta
 
 import pandas as pd
+import requests
 
 from core.credenciais import email_valido
 from sources.base import FonteRadiacao
 
 logger = logging.getLogger(__name__)
 
-# Atraso fixo dos dados do McClear: sempre dois dias atrás.
+# Atraso fixo dos dados do McClear: a última data disponível é hoje - 2 dias.
 ATRASO_DIAS = 2
+
+# Identificadores aceitos pela pvlib/SoDa.
+IDENTIFICADORES_VALIDOS = ("mcclear", "cams_radiation")
 
 # A pvlib espera o passo temporal nos códigos '1min'/'15min'/'1h'/'1d'/'1M',
 # não nos códigos ISO 8601 usados internamente pelo projeto. Convertemos aqui.
@@ -45,20 +64,17 @@ ISO_PARA_PVLIB: dict[str, str] = {
     "P01M": "1M",
 }
 
-# Com map_variables=True a pvlib renomeia as colunas do McClear para nomes
-# padronizados em minúsculas, com o sufixo "_clear" (céu limpo). Mapeamos esses
-# nomes (e também as variantes sem sufixo, por robustez entre versões) para o
-# padrão do projeto. Observação: "BHI" do McClear corresponde ao "BNI" do
-# projeto (irradiação de feixe).
-RENOMEAR_COLUNAS: dict[str, str] = {
-    "ghi_clear": "GHI",
-    "ghi": "GHI",
-    "dni_clear": "DNI",
-    "dni": "DNI",
-    "dhi_clear": "DHI",
-    "dhi": "DHI",
-    "bhi_clear": "BNI",
-    "bhi": "BNI",
+# Mapa de cada componente padrão do projeto para os possíveis nomes que a pvlib
+# devolve (com map_variables=True). Preferimos sempre a versão de CÉU LIMPO
+# ("*_clear"); caímos para a variante sem sufixo apenas por robustez entre
+# versões. Observação: "BHI" (feixe horizontal) do McClear corresponde ao
+# "BNI" do projeto. As colunas de radiação REAL do cams_radiation (ghi, dni,
+# ...) não entram nos componentes padrão (céu limpo) e ficam de fora.
+CANDIDATOS_COMPONENTE: dict[str, tuple[str, ...]] = {
+    "GHI": ("ghi_clear",),
+    "DNI": ("dni_clear",),
+    "DHI": ("dhi_clear",),
+    "BNI": ("bhi_clear",),
 }
 
 
@@ -68,14 +84,40 @@ class CamsMcClear(FonteRadiacao):
     nome = "CAMS McClear"
     inclui_nuvens = False
 
-    def __init__(self, email: str, timeout: int = 120) -> None:
-        """Recebe o e-mail SoDa de autenticação (nunca de constante global)."""
+    #: Contador GLOBAL de chamadas REAIS à API SoDa (cache miss). É de classe
+    #: para o teste de cache poder comprovar que a 2ª extração faz zero
+    #: requisições. Use ``resetar_contador()`` antes de medir.
+    chamadas_reais_api: int = 0
+
+    def __init__(
+        self, email: str, timeout: int = 120, identifier: str = "mcclear"
+    ) -> None:
+        """Recebe o e-mail SoDa (nunca de constante global) e o identificador.
+
+        ``identifier`` aceita "mcclear" (padrão) ou "cams_radiation".
+        """
         self.email = (email or "").strip()
         self.timeout = timeout
+        if identifier not in IDENTIFICADORES_VALIDOS:
+            raise ValueError(
+                f"identifier inválido: {identifier!r}. "
+                f"Use um de {IDENTIFICADORES_VALIDOS}."
+            )
+        self.identifier = identifier
 
     def cobre_local(self, local) -> bool:
         """Cobertura mundial: sempre True."""
         return True
+
+    @classmethod
+    def resetar_contador(cls) -> None:
+        """Zera o contador de chamadas reais à API (usado nos testes)."""
+        cls.chamadas_reais_api = 0
+
+    @staticmethod
+    def ultima_data_disponivel() -> date:
+        """Última data com dados (hoje - ATRASO_DIAS)."""
+        return date.today() - timedelta(days=ATRASO_DIAS)
 
     # ------------------------------------------------------------------
     def buscar(
@@ -86,7 +128,7 @@ class CamsMcClear(FonteRadiacao):
         passo_temporal: str,
     ) -> pd.DataFrame:
         """Busca radiação em céu limpo no McClear (via pvlib) e padroniza."""
-        # Valida o e-mail de autenticação com mensagem amigável.
+        # 1) Valida o e-mail de autenticação com mensagem amigável.
         if not email_valido(self.email):
             raise ValueError(
                 "Para usar o CAMS McClear é preciso informar o e-mail da sua "
@@ -94,40 +136,67 @@ class CamsMcClear(FonteRadiacao):
                 "Configure-o no campo de e-mail da barra lateral."
             )
 
-        # Respeita o atraso de 2 dias: ajusta data_fim e avisa via log.
-        limite = date.today() - timedelta(days=ATRASO_DIAS)
+        # 2) Validação de período: rejeita datas mais recentes que o limite,
+        #    com mensagem amigável informando a última data disponível.
+        limite = self.ultima_data_disponivel()
         if data_fim > limite:
-            logger.warning(
-                "[%s] data_fim %s é mais recente que o limite (hoje - %d dias = "
-                "%s). Ajustando para %s.",
-                self.nome,
-                data_fim,
-                ATRASO_DIAS,
-                limite,
-                limite,
+            raise ValueError(
+                "Os dados do CAMS McClear têm cerca de 2 dias de defasagem. "
+                f"A data final pedida ({data_fim:%d/%m/%Y}) ainda não está "
+                f"disponível. A data mais recente que você pode usar é "
+                f"{limite:%d/%m/%Y}. Ajuste o período e tente de novo."
             )
-            data_fim = limite
         if data_inicio > data_fim:
             raise ValueError(
-                "Após aplicar o atraso de 2 dias do McClear, a data de início "
-                "ficou depois da data de fim. Escolha um período mais antigo."
+                "A data de início não pode ser depois da data de fim. "
+                "Revise o período escolhido."
             )
 
-        # Cache primeiro: mesma consulta nunca rebate na API.
-        chave = self._chave_cache(local, data_inicio, data_fim, passo_temporal)
+        # 3) Cache-first: a mesma consulta nunca rebate na API.
+        chave = self._chave_cache_identificador(
+            local, data_inicio, data_fim, passo_temporal
+        )
         em_cache = self._ler_cache(chave)
         if em_cache is not None:
             return em_cache
 
-        # Converte o passo do projeto (ISO) para o código aceito pela pvlib.
+        # 4) Cache miss -> consulta real à API via pvlib.
+        dados = self._chamar_pvlib(local, data_inicio, data_fim, passo_temporal)
+
+        df = self._padronizar_resposta(dados)
+        # Garante a grade completa do período (instantes faltantes viram NaN).
+        df = self._reindexar_periodo(df, data_inicio, data_fim, passo_temporal)
+        df = self._padronizar_colunas(df)
+        self._salvar_cache(chave, df)
+        return df
+
+    # ------------------------------------------------------------------
+    def _chave_cache_identificador(
+        self, local, data_inicio, data_fim, passo_temporal
+    ) -> str:
+        """Chave de cache que também separa por ``identifier``."""
+        chave = self._chave_cache(local, data_inicio, data_fim, passo_temporal)
+        # Mantém as chaves "mcclear" existentes; só diferencia outros modos.
+        if self.identifier != "mcclear":
+            chave = f"{chave}_{self.identifier}"
+        return chave
+
+    def _chamar_pvlib(
+        self, local, data_inicio, data_fim, passo_temporal
+    ) -> pd.DataFrame:
+        """Faz a chamada REAL à API SoDa via pvlib, com erros amigáveis."""
         time_step = ISO_PARA_PVLIB.get(passo_temporal, "1h")
 
+        # Contabiliza e registra a chamada real (cache miss).
+        type(self).chamadas_reais_api += 1
         logger.info(
-            "[%s] Consultando SoDa via pvlib de %s a %s (passo %s).",
+            "[%s] Chamada REAL à API SoDa (#%d): %s a %s, passo %s, identifier=%s.",
             self.nome,
+            self.chamadas_reais_api,
             data_inicio,
             data_fim,
             passo_temporal,
+            self.identifier,
         )
 
         # Importa pvlib aqui dentro para que o resto do projeto não dependa dela
@@ -138,10 +207,10 @@ class CamsMcClear(FonteRadiacao):
             dados, _meta = pvlib.iotools.get_cams(
                 latitude=local.latitude,
                 longitude=local.longitude,
-                start=data_inicio,
-                end=data_fim,
+                start=pd.Timestamp(data_inicio),
+                end=pd.Timestamp(data_fim),
                 email=self.email,
-                identifier="mcclear",
+                identifier=self.identifier,
                 # Altitude None faz o SoDa estimá-la (via base de dados SRTM).
                 altitude=(
                     local.altitude
@@ -151,28 +220,67 @@ class CamsMcClear(FonteRadiacao):
                 time_step=time_step,
                 time_ref="UT",
                 verbose=False,
-                # Valores integrados (Wh/m² por passo), para ficar consistente
-                # com a NASA POWER, que o projeto normaliza para Wh/m².
+                # Valores integrados (Wh/m² por passo). No passo horário isso é
+                # numericamente igual à irradiância média em W/m².
                 integrated=True,
                 map_variables=True,
                 timeout=self.timeout,
             )
         except Exception as exc:  # noqa: BLE001 - traduzimos para erro amigável
-            raise RuntimeError(
-                "Falha ao consultar o CAMS McClear (SoDa) via pvlib: "
-                f"{exc}\n\n"
-                "Causa mais comum: o e-mail informado precisa estar CADASTRADO "
-                "e CONFIRMADO em soda-pro.com. Após criar a conta, o SoDa envia "
-                "um link de confirmação por e-mail — clique nele antes de usar a "
-                "ferramenta. Verifique também sua conexão com a internet."
-            ) from exc
+            raise RuntimeError(self._mensagem_erro_amigavel(exc)) from exc
+        return dados
 
-        df = self._padronizar_resposta(dados)
-        # Garante a grade completa do período (instantes faltantes viram NaN).
-        df = self._reindexar_periodo(df, data_inicio, data_fim, passo_temporal)
-        df = self._padronizar_colunas(df)
-        self._salvar_cache(chave, df)
-        return df
+    @staticmethod
+    def _mensagem_erro_amigavel(exc: Exception) -> str:
+        """Traduz a exceção da pvlib/SoDa para uma mensagem em português."""
+        txt = str(exc).lower()
+
+        sem_conexao = isinstance(
+            exc, (requests.ConnectionError,)
+        ) or any(
+            t in txt
+            for t in ("connection", "max retries", "failed to establish",
+                      "name or service not known", "getaddrinfo")
+        )
+        if sem_conexao:
+            return (
+                "Não foi possível conectar ao servidor do CAMS (SoDa). "
+                "Verifique sua conexão com a internet e tente novamente."
+            )
+
+        if isinstance(exc, requests.Timeout) or "timed out" in txt or "timeout" in txt:
+            return (
+                "O servidor do CAMS (SoDa) demorou demais para responder "
+                "(tempo esgotado). Tente novamente em alguns minutos."
+            )
+
+        if any(
+            t in txt
+            for t in ("429", "too many", "limit", "quota", "exceeded",
+                      "max number")
+        ):
+            return (
+                "Você atingiu o limite de requisições do CAMS (SoDa) para hoje "
+                "(são 100 por conta/dia). Tente novamente amanhã ou use um "
+                "período menor — repetições idênticas usam o cache e não contam."
+            )
+
+        if any(
+            t in txt
+            for t in ("not registered", "unknown", "403", "forbidden", "401",
+                      "unauthorized", "user", "email", "e-mail")
+        ):
+            return (
+                "O CAMS (SoDa) recusou a autenticação. O e-mail informado "
+                "precisa estar CADASTRADO e CONFIRMADO em soda-pro.com. Após "
+                "criar a conta, o SoDa envia um link de confirmação por e-mail — "
+                "clique nele antes de usar a ferramenta."
+            )
+
+        return (
+            "O serviço do CAMS (SoDa) parece estar indisponível no momento "
+            f"(detalhe técnico: {exc}). Tente novamente mais tarde."
+        )
 
     # ------------------------------------------------------------------
     @staticmethod
@@ -181,24 +289,25 @@ class CamsMcClear(FonteRadiacao):
 
         A pvlib devolve os dados indexados por tempo e (com map_variables=True)
         com nomes em minúsculas. Aqui: o índice vira a coluna ``timestamp`` e os
-        componentes são renomeados para o padrão GHI/DNI/DHI/BNI, mantendo
-        apenas timestamp + os componentes presentes.
+        componentes de CÉU LIMPO são renomeados para o padrão GHI/DNI/DHI/BNI,
+        mantendo apenas timestamp + os componentes presentes. Colunas extras
+        (ghi_extra, e — no cams_radiation — ghi/dni/... reais e Reliability)
+        são ignoradas, pois esta fonte representa o céu limpo.
         """
         df = dados.reset_index()
-        # A primeira colula após reset_index é o tempo (nome varia por versão).
+        # A primeira coluna após reset_index é o tempo (nome varia por versão).
         col_tempo = df.columns[0]
         df = df.rename(columns={col_tempo: "timestamp"})
         df["timestamp"] = pd.to_datetime(df["timestamp"]).dt.tz_localize(None)
 
-        # Renomeia os componentes conhecidos para o padrão do projeto.
-        renomear = {c: RENOMEAR_COLUNAS[c] for c in df.columns if c in RENOMEAR_COLUNAS}
-        df = df.rename(columns=renomear)
-
-        # Mantém apenas timestamp + componentes padrão presentes.
-        componentes = [c for c in ("GHI", "DNI", "DHI", "BNI") if c in df.columns]
         resultado = pd.DataFrame({"timestamp": df["timestamp"]})
-        for c in componentes:
-            resultado[c] = pd.to_numeric(df[c], errors="coerce")
+        for padrao, candidatos in CANDIDATOS_COMPONENTE.items():
+            for nome_pvlib in candidatos:
+                if nome_pvlib in df.columns:
+                    resultado[padrao] = pd.to_numeric(
+                        df[nome_pvlib], errors="coerce"
+                    )
+                    break
 
         resultado = resultado.dropna(subset=["timestamp"]).reset_index(drop=True)
         return resultado

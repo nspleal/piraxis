@@ -79,30 +79,44 @@ def test_email_invalido_lanca_erro():
         fonte.buscar(BOTUCATU, date(2024, 1, 1), date(2024, 1, 1), "PT01H")
 
 
-def test_ajuste_atraso_dois_dias(mock_get_cams, caplog):
-    """data_fim futura deve ser ajustada para hoje - 2 dias, com aviso no log."""
-    import logging
-
+def test_rejeita_data_recente(mock_get_cams):
+    """data_fim mais recente que hoje-2 deve ser REJEITADA com mensagem amigável."""
     hoje = date.today()
     fonte = CamsMcClear(EMAIL_TESTE)
-    with caplog.at_level(logging.WARNING):
+    with pytest.raises(ValueError, match="defasagem|disponível"):
         fonte.buscar(BOTUCATU, hoje - timedelta(days=5), hoje, "PT01H")
-
-    assert any("ajustando" in m.lower() for m in caplog.messages)
+    # E não pode ter chamado a API (rejeição acontece antes).
+    assert mock_get_cams["n"] == 0
 
 
 def test_cache_evita_segunda_chamada(mock_get_cams):
     """A segunda extração idêntica deve ler do cache, sem nova chamada pvlib."""
+    CamsMcClear.resetar_contador()
     fonte = CamsMcClear(EMAIL_TESTE)
     args = (BOTUCATU, date(2024, 1, 1), date(2024, 1, 1), "PT01H")
     fonte.buscar(*args)
     fonte.buscar(*args)  # deveria vir do cache
 
     assert mock_get_cams["n"] == 1
+    # O contador interno de chamadas REAIS também deve registrar só uma.
+    assert CamsMcClear.chamadas_reais_api == 1
+
+
+def test_identifier_invalido_lanca_erro():
+    """Só 'mcclear' e 'cams_radiation' são aceitos."""
+    with pytest.raises(ValueError, match="identifier"):
+        CamsMcClear(EMAIL_TESTE, identifier="foo")
+
+
+def test_identifier_cams_radiation_aceito(mock_get_cams):
+    """cams_radiation é aceito e usa cache separado do mcclear."""
+    fonte = CamsMcClear(EMAIL_TESTE, identifier="cams_radiation")
+    df = fonte.buscar(BOTUCATU, date(2024, 1, 1), date(2024, 1, 1), "PT01H")
+    assert "GHI" in df.columns and len(df) == 24
 
 
 def test_erro_amigavel_quando_pvlib_falha(monkeypatch):
-    """Falha do SoDa/pvlib vira RuntimeError com mensagem clara sobre confirmar e-mail."""
+    """Falha de autenticação vira RuntimeError claro sobre confirmar o e-mail."""
 
     def fake_falha(*args, **kwargs):
         raise ValueError("User ... is not registered")
