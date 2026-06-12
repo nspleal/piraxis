@@ -43,7 +43,8 @@ from core.pipeline import extrair_mcclear_para_excel
 
 # Rótulos em português que devem aparecer na aba "Resumo".
 ROTULOS_RESUMO = ["Local", "Período", "Fontes usadas", "Passo temporal"]
-COLUNAS_RADIACAO = ["GHI", "DNI", "DHI", "BNI"]
+# Colunas da TabDados no formato do modelo oficial (passo horário -> W/m²).
+COLUNAS_RADIACAO = ["GHI (W/m²)", "DNI (W/m²)", "DHI (W/m²)", "BNI (W/m²)"]
 
 
 def _checar_erro_amigavel() -> tuple[bool, str]:
@@ -78,11 +79,13 @@ def _checar_excel(email: str) -> tuple[bool, str]:
 
         problemas: list[str] = []
         wb = load_workbook(caminho)
-        nomes = set(wb.sheetnames)
-        if not {"Resumo", "Dados"}.issubset(nomes):
-            problemas.append(f"abas faltando: {{'Resumo','Dados'}}-{nomes}")
-        if "Comparação" in nomes:
-            problemas.append("aba 'Comparação' não deveria existir (1 fonte)")
+        # O modelo oficial tem exatamente estas duas abas, nesta ordem.
+        if wb.sheetnames != ["Resumo", "Dados"]:
+            problemas.append(f"abas={wb.sheetnames} (esperado [Resumo, Dados])")
+
+        # Tabela estruturada TabDados presente (as fórmulas dependem dela).
+        if "TabDados" not in wb["Dados"].tables:
+            problemas.append("tabela estruturada 'TabDados' ausente na aba Dados")
 
         # Rótulos em português na aba Resumo.
         resumo_txt = "\n".join(
@@ -95,18 +98,23 @@ def _checar_excel(email: str) -> tuple[bool, str]:
             if rotulo not in resumo_txt:
                 problemas.append(f"rótulo ausente no Resumo: {rotulo!r}")
 
-        # Aba Dados via pandas.
-        dados = pd.read_excel(caminho, sheet_name="Dados")
+        # Aba Dados via pandas (só as colunas da TabDados: A até E).
+        dados = pd.read_excel(caminho, sheet_name="Dados", usecols="A:E")
         if len(dados) != 72:
             problemas.append(f"linhas de dados={len(dados)} (esperado 72)")
         cols_rad = [c for c in COLUNAS_RADIACAO if c in dados.columns]
+        if not cols_rad:
+            problemas.append(
+                f"nenhuma coluna do modelo encontrada em {list(dados.columns)}"
+            )
         for c in cols_rad:
             if dados[c].isna().any():
                 problemas.append(f"coluna de radiação com célula vazia: {c}")
 
         # Pico de GHI no Excel == no DataFrame de origem.
-        if "GHI" in dados.columns and "GHI" in combinado.columns:
-            pico_excel = float(dados["GHI"].max())
+        col_ghi = "GHI (W/m²)"
+        if col_ghi in dados.columns and "GHI" in combinado.columns:
+            pico_excel = float(dados[col_ghi].max())
             pico_df = float(combinado["GHI"].max())
             if abs(pico_excel - pico_df) > 0.05:
                 problemas.append(

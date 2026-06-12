@@ -95,13 +95,20 @@ e-mail salvo na máquina. Para gravar como padrão da máquina, use o botão
 
 ## A planilha gerada
 
-O arquivo `radiacao_<local>_<inicio>_<fim>.xlsx` é salvo na pasta `data/` e tem:
+O arquivo `radiacao_<local>_<inicio>_<fim>.xlsx` é salvo na pasta `data/` e segue
+o **modelo oficial do projeto** (planilha_modelo_para_IC), com duas abas:
 
-- **Resumo** — metadados do estudo e estatísticas (média/máx/mín) calculadas com
-  **fórmulas do Excel**.
-- **Dados** — a série temporal completa, uma linha por instante.
-- **Comparação** — só quando você usa as duas fontes: índice de claridade,
-  diferença McClear vs NASA e um **gráfico** nativo do Excel.
+- **Resumo** — título, informações gerais do estudo e a tabela "Estatísticas de
+  Radiação" (Média, Média Diurna, Máximo, Mínimo Diurno, Energia e kWh/m²/dia),
+  tudo calculado com **fórmulas do Excel**, mais um **gráfico comparativo** por
+  componente.
+- **Dados** — a série temporal completa numa **tabela do Excel** chamada
+  `TabDados` (filtros automáticos e listras), uma tabela de **Energia Diária**
+  e dois gráficos: radiação ao longo do tempo e energia por dia.
+
+Na extração **combinada** (duas fontes), as colunas aparecem com o sufixo da
+fonte (ex.: `GHI_McClear`, `GHI_NASA`) e o índice de claridade `kt` entra como
+coluna na própria tabela de dados.
 
 ---
 

@@ -1,36 +1,49 @@
 """
-Testes do exportador Excel (output/exporta_excel.py).
+Testes do exportador Excel (output/exporta_excel.py) — formato do MODELO
+oficial (planilha_modelo_para_IC.xlsx):
 
-Cobrem: a planilha é criada, tem as abas esperadas e as fórmulas não geram
-erro (verificamos que as células de estatística contêm fórmulas =AVERAGE/
-=MAX/=MIN e que nenhuma célula contém um erro do Excel do tipo "#...!").
+  - duas abas: Resumo e Dados (a antiga "Comparação" foi aposentada);
+  - aba Dados com a tabela estruturada ``TabDados`` (colunas "Timestamp" +
+    "<COMPONENTE> (W/m²)") e a tabela auxiliar de Energia Diária;
+  - aba Resumo com metadados, estatísticas por FÓRMULA sobre a TabDados
+    (AVERAGE/AVERAGEIF/MAX/MINIFS/SUM/kWh por dia) e legenda;
+  - três gráficos (barras no Resumo; linha + barras de energia nos Dados);
+  - kt presente nos dados mas fora das estatísticas; NaN vira célula vazia.
 """
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 from openpyxl import load_workbook
 
 from output.exporta_excel import exporta
 
 
-def _df_uma_fonte() -> pd.DataFrame:
+def _df_uma_fonte(n_horas: int = 72) -> pd.DataFrame:
+    ts = pd.date_range("2026-01-01 00:00", periods=n_horas, freq="h")
+    h = ts.hour.values.astype(float)
+    ghi = np.clip(np.cos((h - 15) / 5.0 * (np.pi / 2)), 0, None) * 600.0
+    ghi = np.where((h >= 10) & (h <= 20), ghi, 0.0)
     return pd.DataFrame(
         {
-            "timestamp": pd.date_range("2024-01-01 10:00", periods=3, freq="h"),
-            "GHI": [500.0, 600.0, 550.0],
-            "DNI": [300.0, 350.0, 320.0],
+            "timestamp": ts,
+            "GHI": ghi.round(1),
+            "DNI": (ghi * 1.3).round(1),
+            "DHI": (ghi * 0.2).round(1),
+            "BNI": (ghi * 0.8).round(1),
         }
     )
 
 
 def _df_duas_fontes() -> pd.DataFrame:
+    df = _df_uma_fonte()
     return pd.DataFrame(
         {
-            "timestamp": pd.date_range("2024-01-01 10:00", periods=3, freq="h"),
-            "GHI_McClear": [700.0, 800.0, 750.0],
-            "GHI_NASA": [500.0, 600.0, 550.0],
-            "kt": [0.714, 0.75, 0.733],
+            "timestamp": df["timestamp"],
+            "GHI_McClear": df["GHI"],
+            "GHI_NASA": df["GHI"] * 0.7,
+            "kt": np.where(df["GHI"] > 0, 0.7, np.nan),
         }
     )
 
@@ -41,56 +54,135 @@ def _metadados() -> dict:
         "latitude": -22.8867,
         "longitude": -48.4450,
         "altitude": 786.0,
-        "periodo": "01/01/2024 a 01/01/2024",
-        "fontes": "NASA POWER",
+        "periodo": "01/01/2026 a 03/01/2026",
+        "fontes": "CAMS McClear",
         "passo_temporal": "1 hora",
-        "email_soda": "(não aplicável)",
+        "email_soda": "pesquisador@unesp.br",
     }
 
 
-def test_planilha_uma_fonte(tmp_path):
+def test_estrutura_basica_do_modelo(tmp_path):
     caminho = tmp_path / "saida.xlsx"
     exporta(_df_uma_fonte(), _metadados(), caminho)
 
-    assert caminho.exists()
     wb = load_workbook(caminho)
-    assert "Resumo" in wb.sheetnames
-    assert "Dados" in wb.sheetnames
-    # Sem duas fontes, não há aba Comparação.
-    assert "Comparação" not in wb.sheetnames
+    # Só as duas abas do modelo, na ordem Resumo -> Dados.
+    assert wb.sheetnames == ["Resumo", "Dados"]
+
+    ws = wb["Dados"]
+    assert ws.freeze_panes == "A2"
+    # Tabela estruturada com os nomes de coluna do modelo.
+    tab = ws.tables["TabDados"]
+    assert tab.ref == "A1:E73"
+    assert [c.name for c in tab.tableColumns] == [
+        "Timestamp", "GHI (W/m²)", "DNI (W/m²)", "DHI (W/m²)", "BNI (W/m²)",
+    ]
+    # Tabela auxiliar de Energia Diária (3 dias -> 3 linhas a partir de G25).
+    assert ws["G24"].value == "Dia"
+    assert ws["H24"].value == "GHI (Wh/m²)"
+    assert ws["G25"].value == "=DATE(2026,1,1)"
+    assert ws["G26"].value == "=G25+1"
+    assert ws["H25"].value.startswith("=SUMIFS(TabDados[GHI (W/m²)]")
+    assert ws["G28"].value is None  # só 3 dias
 
 
-def test_planilha_duas_fontes_tem_comparacao(tmp_path):
+def test_resumo_formulas_e_metadados(tmp_path):
+    caminho = tmp_path / "saida.xlsx"
+    exporta(_df_uma_fonte(), _metadados(), caminho)
+
+    r = load_workbook(caminho)["Resumo"]
+    assert r["A1"].value == "Relatório de Radiação Solar"
+    assert r["A2"].value == '=B4&" • "&B8'  # subtítulo dinâmico do modelo
+    assert r["A3"].value == "Informações Gerais"
+    rotulos = [r.cell(row=i, column=1).value for i in range(4, 13)]
+    assert rotulos == [
+        "Local", "Latitude", "Longitude", "Altitude (m)", "Período",
+        "Fontes usadas", "Passo temporal", "E-mail SoDa usado",
+        "Data de geração",
+    ]
+    assert r["B12"].number_format == "@"
+
+    # Cabeçalho e fórmulas da tabela de estatísticas (linha do GHI).
+    assert [r.cell(row=3, column=j).value for j in range(6, 13)] == [
+        "Componente", "Média", "Média Diurna", "Máximo", "Mínimo Diurno",
+        "Energia (Wh/m²)", "kWh/m²/dia",
+    ]
+    assert r["F4"].value == "GHI"
+    assert r["G4"].value == "=AVERAGE(TabDados[GHI (W/m²)])"
+    assert r["H4"].value == '=AVERAGEIF(TabDados[GHI (W/m²)],">0")'
+    assert r["I4"].value == "=MAX(TabDados[GHI (W/m²)])"
+    assert r["J4"].value == (
+        '=_xlfn.MINIFS(TabDados[GHI (W/m²)],TabDados[GHI (W/m²)],">0")'
+    )
+    assert r["K4"].value == "=SUM(TabDados[GHI (W/m²)])"
+    assert r["L4"].value == "=K4/(COUNT(TabDados[Timestamp])/24)/1000"
+
+
+def test_tres_graficos_do_modelo(tmp_path):
+    caminho = tmp_path / "saida.xlsx"
+    exporta(_df_uma_fonte(), _metadados(), caminho)
+
+    wb = load_workbook(caminho)
+    tipos = [
+        (aba.title, type(ch).__name__)
+        for aba in wb.worksheets
+        for ch in aba._charts
+    ]
+    assert tipos == [
+        ("Resumo", "BarChart"),
+        ("Dados", "LineChart"),
+        ("Dados", "BarChart"),
+    ]
+
+
+def test_duas_fontes_kt_fora_das_estatisticas(tmp_path):
     caminho = tmp_path / "saida2.xlsx"
     exporta(_df_duas_fontes(), _metadados(), caminho)
 
     wb = load_workbook(caminho)
-    assert set(["Resumo", "Dados", "Comparação"]).issubset(set(wb.sheetnames))
+    assert wb.sheetnames == ["Resumo", "Dados"]  # nunca há aba Comparação
+
+    # kt entra na TabDados (sem unidade), mas não nas estatísticas.
+    tab = wb["Dados"].tables["TabDados"]
+    nomes = [c.name for c in tab.tableColumns]
+    assert "kt" in nomes
+    assert "GHI_McClear (W/m²)" in nomes
+
+    r = wb["Resumo"]
+    componentes = []
+    i = 4
+    while r.cell(row=i, column=7).value:  # enquanto houver fórmula de Média
+        componentes.append(r.cell(row=i, column=6).value)
+        i += 1
+    assert componentes == ["GHI_McClear", "GHI_NASA"]
+    assert "kt" not in componentes
 
 
-def test_estatisticas_usam_formulas_e_sem_erros(tmp_path):
+def test_nan_vira_celula_vazia_e_sem_erros(tmp_path):
+    df = _df_uma_fonte()
+    df.loc[5, "GHI"] = np.nan
     caminho = tmp_path / "saida3.xlsx"
-    exporta(_df_uma_fonte(), _metadados(), caminho)
+    exporta(df, _metadados(), caminho)
 
     wb = load_workbook(caminho)
-    resumo = wb["Resumo"]
-
-    # Procura ao menos uma fórmula de estatística.
-    formulas = [
-        cel.value
-        for linha in resumo.iter_rows()
-        for cel in linha
-        if isinstance(cel.value, str) and cel.value.startswith("=")
-    ]
-    assert any(f.startswith("=AVERAGE(") for f in formulas)
-    assert any(f.startswith("=MAX(") for f in formulas)
-    assert any(f.startswith("=MIN(") for f in formulas)
-
-    # Nenhuma célula deve conter um erro de fórmula do Excel.
+    # Linha 7 (índice 5 + cabeçalho) com GHI vazio, não zero.
+    assert wb["Dados"]["B7"].value is None
+    # Nenhuma célula com erro de fórmula em nenhuma aba.
     for ws in wb.worksheets:
         for linha in ws.iter_rows():
             for cel in linha:
                 if isinstance(cel.value, str):
                     assert not cel.value.startswith("#"), (
-                        f"Erro de fórmula em {ws.title}!{cel.coordinate}: {cel.value}"
+                        f"Erro em {ws.title}!{cel.coordinate}: {cel.value}"
                     )
+
+
+def test_passo_diario_usa_unidade_wh(tmp_path):
+    ts = pd.date_range("2026-01-01", periods=10, freq="D")
+    df = pd.DataFrame({"timestamp": ts, "GHI": np.full(10, 6500.0)})
+    caminho = tmp_path / "saida4.xlsx"
+    exporta(df, _metadados() | {"passo_temporal": "1 dia"}, caminho)
+
+    wb = load_workbook(caminho)
+    assert wb["Dados"]["B1"].value == "GHI (Wh/m²)"
+    assert wb["Resumo"]["L4"].value == "=K4/(COUNT(TabDados[Timestamp])/1)/1000"
