@@ -110,6 +110,50 @@ Na extração **combinada** (duas fontes), as colunas aparecem com o sufixo da
 fonte (ex.: `GHI_McClear`, `GHI_NASA`) e o índice de claridade `kt` entra como
 coluna na própria tabela de dados.
 
+Além dessas, a planilha traz mais **duas abas**:
+
+- **Qualidade** — o relatório automático de **controle de qualidade** (veja
+  abaixo): completude, alertas e o resultado de cada verificação, com uma
+  legenda dos critérios usados.
+- **Reprodutibilidade** — a **proveniência** da extração (de onde, quando e
+  como os dados vieram) e o bloco de **citações e agradecimentos** prontos para
+  um artigo.
+
+A ferramenta também salva, ao lado da planilha, dois arquivos para o seu artigo:
+
+- **`..._reprodutibilidade.md`** — texto de metodologia (em **português e
+  inglês**) e as referências/agradecimentos.
+- **`..._proveniencia.json`** — o registro técnico da extração (versões de
+  software, parâmetros etc.). *O e-mail da conta SoDa nunca é incluído* — é uma
+  credencial pessoal e irrelevante para a ciência (o dado é o mesmo seja qual
+  for a conta).
+
+---
+
+## Controle de qualidade (o que cada verificação significa)
+
+Toda extração passa por checagens automáticas, no padrão da radiometria solar.
+O **status geral** é **OK**, **Atenção** ou **Problemas**:
+
+- **Completude / lacunas** — quantos instantes do período realmente vieram com
+  dado, e onde há "buracos".
+- **Valores negativos** — radiação não pode ser negativa (um pequeno ruído de
+  arredondamento, até −1, é tolerado).
+- **Radiação noturna** — à noite (Sol abaixo do horizonte) a radiação deve ser
+  ~0; valores altos são sinalizados.
+- **Envelope de céu limpo** — a radiação **real** (com nuvens) não pode superar
+  a de **céu limpo** além de uma margem (10% em passo ≥ 1 h; 25% em alta
+  frequência, por causa do fenômeno real de *cloud enhancement*).
+- **Equação de fechamento** — confere a relação física `GHI ≈ DHI + DNI·cos(θz)`.
+  Vale em **alta frequência** (1 e 15 min, e 1 h com tolerância maior); em
+  **diário/mensal** é marcada como **"não aplicável"** (a relação não vale sobre
+  valores somados no tempo).
+- **Concordância entre fontes** — quando você usa as duas, compara o céu limpo
+  do **McClear** com o do **NASA (CLRSKY)** — duas estimativas independentes —
+  com RMSE, viés e correlação. Não custa requisição extra.
+
+A geometria solar (posição do Sol) é calculada com a biblioteca **pvlib**.
+
 ---
 
 ## Detalhes técnicos úteis

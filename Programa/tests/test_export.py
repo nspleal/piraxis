@@ -177,6 +177,40 @@ def test_nan_vira_celula_vazia_e_sem_erros(tmp_path):
                     )
 
 
+def test_abas_qualidade_e_reprodutibilidade(tmp_path):
+    """Com QC e reprodutibilidade, surgem as duas abas extras sem quebrar as outras."""
+    from datetime import date
+
+    from core.config import BOTUCATU
+    from core.qualidade import analisar_qualidade
+    from core.reprodutibilidade import gerar_reprodutibilidade
+
+    df = _df_uma_fonte()
+    qc = analisar_qualidade(df, BOTUCATU, "PT01H", ["CAMS McClear"])
+    repro = gerar_reprodutibilidade(
+        BOTUCATU, date(2026, 1, 1), date(2026, 1, 3), "PT01H", "1 hora",
+        ["CAMS McClear"], ["GHI", "DNI", "DHI", "BNI"],
+    )
+    caminho = tmp_path / "saida_qc.xlsx"
+    exporta(df, _metadados(), caminho, relatorio_qc=qc, reprodutibilidade=repro)
+
+    wb = load_workbook(caminho)
+    assert wb.sheetnames == ["Resumo", "Dados", "Qualidade", "Reprodutibilidade"]
+    # Conteúdos-chave presentes.
+    q_txt = " ".join(
+        str(c.value) for row in wb["Qualidade"].iter_rows()
+        for c in row if c.value is not None
+    )
+    assert "Controle de Qualidade" in q_txt
+    assert "Completude" in q_txt
+    r_txt = " ".join(
+        str(c.value) for row in wb["Reprodutibilidade"].iter_rows()
+        for c in row if c.value is not None
+    )
+    assert "Holmgren" in r_txt  # citação do pvlib
+    assert "pesquisador@unesp.br" not in r_txt  # e-mail nunca na reprodutibilidade
+
+
 def test_passo_diario_usa_unidade_wh(tmp_path):
     ts = pd.date_range("2026-01-01", periods=10, freq="D")
     df = pd.DataFrame({"timestamp": ts, "GHI": np.full(10, 6500.0)})

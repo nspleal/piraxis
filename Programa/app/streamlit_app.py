@@ -43,6 +43,8 @@ import streamlit as st
 from core import credenciais
 from core.combinador import combinar
 from core.config import BOTUCATU, PASSOS_TEMPORAIS
+from core.qualidade import analisar_qualidade
+from core.reprodutibilidade import gerar_reprodutibilidade
 from output.exporta_excel import exporta, nome_arquivo_saida
 from sources.cams_mcclear import ATRASO_DIAS, CamsMcClear
 from sources.nasa_power import NasaPower
@@ -382,6 +384,39 @@ if extrair:
                 "email_soda": _email_efetivo() if usar_mcclear else "(não aplicável)",
             }
             st.session_state["periodo_arquivo"] = (data_inicio, data_fim, local.nome)
+
+            # Controle de qualidade + reprodutibilidade (não quebram a extração).
+            nomes_fontes = list(resultados.keys())
+            colunas_rad = [
+                c
+                for c in combinado.columns
+                if c != "timestamp" and c != "kt"
+                and pd.api.types.is_numeric_dtype(combinado[c])
+            ]
+            bases: list[str] = []
+            for c in colunas_rad:
+                base = (
+                    c.replace("_McClear", "").replace("_NASA", "")
+                    .replace("_ceu_limpo", "")
+                )
+                if base not in bases:
+                    bases.append(base)
+            try:
+                st.session_state["qc"] = analisar_qualidade(
+                    combinado, local, passo_temporal, nomes_fontes
+                )
+            except Exception as exc:  # pragma: no cover - QC nunca derruba a UI
+                st.session_state["qc"] = None
+                logging.getLogger(__name__).warning("Falha no QC: %s", exc)
+            try:
+                st.session_state["repro"] = gerar_reprodutibilidade(
+                    local, data_inicio, data_fim, passo_temporal, rotulo_passo,
+                    nomes_fontes, bases,
+                )
+            except Exception as exc:  # pragma: no cover
+                st.session_state["repro"] = None
+                logging.getLogger(__name__).warning("Falha na reprodutibilidade: %s", exc)
+
             st.success(
                 f"✓ Extração concluída: {len(combinado)} registros de "
                 f"{data_inicio:%d/%m/%Y} a {data_fim:%d/%m/%Y}."
@@ -440,6 +475,76 @@ if "combinado" in st.session_state:
     for coluna, (rotulo, valor) in zip(st.columns(len(cards)), cards):
         coluna.metric(rotulo, valor)
 
+    # --- Painel de qualidade ----------------------------------------------
+    qc = st.session_state.get("qc")
+    if qc is not None:
+        st.divider()
+        st.subheader("🔎 Qualidade dos dados")
+        msg = f"Status geral: **{qc.status_geral}**"
+        if qc.status_geral == "OK":
+            st.success(f"✓ {msg} — os dados passaram nas verificações automáticas.")
+        elif qc.status_geral == "Atenção":
+            st.warning(f"⚠️ {msg} — há pontos a conferir (detalhes abaixo).")
+        else:
+            st.error(f"✗ {msg} — verifique os alertas antes de usar os dados.")
+
+        n_alertas = (
+            qc.n_negativos
+            + qc.n_noturno_suspeito
+            + (qc.envelope["n_violacoes"] if qc.envelope else 0)
+            + (qc.fechamento["n_fora"] if qc.fechamento["aplicavel"] else 0)
+        )
+        cols_qc = st.columns(3)
+        cols_qc[0].metric("Completude", f"{qc.completude_pct:.1f}%")
+        cols_qc[1].metric("Alertas", _fmt_num(n_alertas, 0))
+        if qc.concordancia_fontes is not None:
+            cols_qc[2].metric(
+                "RMSE rel. (fontes)",
+                f"{qc.concordancia_fontes['rmse_rel_pct']:.1f}%",
+            )
+        else:
+            cols_qc[2].metric("Lacunas", _fmt_num(len(qc.lacunas), 0))
+
+        with st.expander("Ver relatório de qualidade"):
+            st.text(qc.resumo_texto)
+            if qc.lacunas:
+                st.caption(f"Lacunas (até 20): {len(qc.lacunas)} intervalo(s).")
+                st.dataframe(pd.DataFrame(qc.lacunas), use_container_width=True)
+            nan_itens = {k: v for k, v in qc.nan_por_coluna.items() if v}
+            if nan_itens:
+                st.caption("Valores ausentes (NaN) por coluna:")
+                st.json(nan_itens)
+
+    # --- Reprodutibilidade e citações -------------------------------------
+    repro = st.session_state.get("repro")
+    if repro is not None:
+        with st.expander("📑 Reprodutibilidade e citações"):
+            st.markdown("**Metodologia (PT)**")
+            st.write(repro.metodologia_pt)
+            st.markdown("**Methodology (EN)**")
+            st.write(repro.metodologia_en)
+            st.markdown("**Referências e agradecimentos**")
+            st.markdown(repro.citacoes_md)
+            import json as _json
+
+            data_ini, data_f, nome_loc = st.session_state["periodo_arquivo"]
+            base_nome = nome_arquivo_saida(nome_loc, data_ini, data_f).stem
+            col_md, col_js = st.columns(2)
+            col_md.download_button(
+                "⬇️ Baixar metodologia (.md)",
+                data=repro.markdown.encode("utf-8"),
+                file_name=f"{base_nome}_reprodutibilidade.md",
+                mime="text/markdown",
+            )
+            col_js.download_button(
+                "⬇️ Baixar proveniência (.json)",
+                data=_json.dumps(
+                    repro.proveniencia, ensure_ascii=False, indent=2
+                ).encode("utf-8"),
+                file_name=f"{base_nome}_proveniencia.json",
+                mime="application/json",
+            )
+
     # --- Gráficos ----------------------------------------------------------
     st.divider()
     tem_serie = any(
@@ -472,7 +577,13 @@ if "combinado" in st.session_state:
         try:
             data_ini, data_f, nome_loc = st.session_state["periodo_arquivo"]
             caminho = nome_arquivo_saida(nome_loc, data_ini, data_f)
-            exporta(combinado, st.session_state["metadados"], caminho)
+            exporta(
+                combinado,
+                st.session_state["metadados"],
+                caminho,
+                relatorio_qc=st.session_state.get("qc"),
+                reprodutibilidade=st.session_state.get("repro"),
+            )
             with open(caminho, "rb") as fh:
                 st.download_button(
                     "Clique para baixar a planilha",

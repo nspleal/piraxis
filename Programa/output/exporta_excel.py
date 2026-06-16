@@ -135,8 +135,22 @@ def _rotulo_coluna(col: str, unidade: str) -> str:
 # ---------------------------------------------------------------------------
 # Função principal
 # ---------------------------------------------------------------------------
-def exporta(df: pd.DataFrame, metadados: dict, caminho_saida: str | Path) -> Path:
-    """Gera o .xlsx no formato do modelo oficial. Retorna o Path gerado."""
+def exporta(
+    df: pd.DataFrame,
+    metadados: dict,
+    caminho_saida: str | Path,
+    relatorio_qc=None,
+    reprodutibilidade=None,
+) -> Path:
+    """Gera o .xlsx no formato do modelo oficial. Retorna o Path gerado.
+
+    Parâmetros opcionais:
+      - ``relatorio_qc``: um ``core.qualidade.RelatorioQC``; se presente, gera a
+        aba "Qualidade".
+      - ``reprodutibilidade``: um ``core.reprodutibilidade.Reprodutibilidade``;
+        se presente, gera a aba "Reprodutibilidade".
+    As abas existentes (Resumo, Dados) não são alteradas por esses parâmetros.
+    """
     caminho_saida = Path(caminho_saida)
     caminho_saida.parent.mkdir(parents=True, exist_ok=True)
 
@@ -187,6 +201,14 @@ def exporta(df: pd.DataFrame, metadados: dict, caminho_saida: str | Path) -> Pat
         rotulos,
         tem_dados=len(df) > 0,
     )
+
+    # Abas novas (QC e reprodutibilidade), sem tocar nas existentes.
+    if relatorio_qc is not None:
+        _escrever_qualidade(wb.create_sheet("Qualidade"), relatorio_qc)
+    if reprodutibilidade is not None:
+        _escrever_reprodutibilidade(
+            wb.create_sheet("Reprodutibilidade"), reprodutibilidade
+        )
 
     wb.active = 0
     wb.save(caminho_saida)
@@ -520,6 +542,239 @@ def _escrever_resumo(
         linha_grafico = max(14, linha_legenda + 2)
         ws.row_dimensions[linha_grafico - 1].height = 9.95
         ws.add_chart(grafico, f"A{linha_grafico}")
+
+
+# ---------------------------------------------------------------------------
+# Aba "Qualidade" (controle de qualidade dos dados)
+# ---------------------------------------------------------------------------
+_FILL_STATUS = {
+    "OK": PatternFill("solid", fgColor="FFC6EFCE"),
+    "Atenção": PatternFill("solid", fgColor="FFFFEB9C"),
+    "Problemas": PatternFill("solid", fgColor="FFFFC7CE"),
+}
+
+
+def _titulo_secao(ws: Worksheet, linha: int, texto: str, larg: int = 4) -> None:
+    """Escreve um título de seção com fundo azul mesclado em ``larg`` colunas."""
+    ws.merge_cells(start_row=linha, start_column=1, end_row=linha, end_column=larg)
+    cel = ws.cell(row=linha, column=1, value=texto)
+    cel.font = _fonte_cab
+    cel.fill = _fill_azul
+    cel.alignment = _centro
+
+
+def _escrever_qualidade(ws: Worksheet, qc) -> None:
+    """Escreve o resumo do RelatorioQC com formatação profissional."""
+    ws.column_dimensions["A"].width = 34
+    ws.column_dimensions["B"].width = 26
+    ws.column_dimensions["C"].width = 22
+    ws.column_dimensions["D"].width = 22
+
+    ws.merge_cells("A1:D1")
+    cel = ws["A1"]
+    cel.value = "Controle de Qualidade dos Dados"
+    cel.font = _fonte_titulo
+    cel.alignment = _centro
+    for c in ws["A1:D1"][0]:
+        c.fill = _fill_azul
+
+    # Status geral, destacado pela cor.
+    ws.cell(row=3, column=1, value="Status geral").font = _fonte_rotulo
+    cel = ws.cell(row=3, column=2, value=qc.status_geral)
+    cel.font = Font(name=FONTE, size=12, bold=True)
+    cel.fill = _FILL_STATUS.get(qc.status_geral, _fill_zebra)
+    cel.alignment = _centro
+
+    pares = [
+        ("Completude (%)", f"{qc.completude_pct:.1f}"),
+        ("Instantes esperados", qc.total_esperado),
+        ("Instantes com dado", qc.total_presente),
+        ("Lacunas (intervalos)", len(qc.lacunas)),
+        ("Valores negativos", qc.n_negativos),
+        ("Suspeitos à noite", qc.n_noturno_suspeito),
+    ]
+    linha = 4
+    for rotulo, valor in pares:
+        ws.cell(row=linha, column=1, value=rotulo).font = _fonte_rotulo
+        ws.cell(row=linha, column=2, value=valor).font = _fonte_normal
+        linha += 1
+
+    # Tabela de verificações.
+    linha += 1
+    _titulo_secao(ws, linha, "Verificações")
+    linha += 1
+    cab = ["Verificação", "Resultado", "Detalhe", ""]
+    for j, nome in enumerate(cab[:3], start=1):
+        cel = ws.cell(row=linha, column=j, value=nome)
+        cel.font = _fonte_cab
+        cel.fill = _fill_azul
+        cel.alignment = _centro
+        cel.border = _borda_fina
+    linha += 1
+
+    def linha_verif(nome, resultado, detalhe):
+        nonlocal linha
+        ws.cell(row=linha, column=1, value=nome).font = _fonte_normal
+        cel = ws.cell(row=linha, column=2, value=resultado)
+        cel.font = _fonte_normal
+        if resultado in _FILL_STATUS:
+            cel.fill = _FILL_STATUS[resultado]
+        ws.cell(row=linha, column=3, value=detalhe).font = _fonte_normal
+        for j in range(1, 4):
+            ws.cell(row=linha, column=j).border = _borda_fina
+        linha += 1
+
+    # Completude
+    res_compl = "OK" if qc.completude_pct >= 99 else (
+        "Atenção" if qc.completude_pct >= 90 else "Problemas"
+    )
+    linha_verif("Completude / lacunas", res_compl,
+                f"{qc.completude_pct:.1f}% · {len(qc.lacunas)} lacuna(s)")
+    # Negativos
+    linha_verif("Valores negativos (< -1)", "OK" if qc.n_negativos == 0 else "Atenção",
+                f"{qc.n_negativos} valor(es)")
+    # Noturno
+    linha_verif("Radiação noturna", "OK" if qc.n_noturno_suspeito == 0 else "Atenção",
+                f"{qc.n_noturno_suspeito} suspeito(s)")
+    # Envelope
+    if qc.envelope is None:
+        linha_verif("Envelope de céu limpo", "Não aplicável", "sem real + céu limpo")
+    else:
+        env = qc.envelope
+        res = "OK" if env["n_violacoes"] == 0 else (
+            "Problemas" if env["n_violacoes"] / max(1, env["n_avaliado"]) > 0.15
+            else "Atenção"
+        )
+        linha_verif("Envelope de céu limpo", res,
+                    f"{env['n_violacoes']} viol. · máx {env['excesso_max_rel']:.1%} "
+                    f"(tol. {env['tolerancia']:.0%})")
+    # Fechamento
+    fch = qc.fechamento
+    if not fch["aplicavel"]:
+        linha_verif("Fechamento GHI=DHI+DNI·cosθz", "Não aplicável", fch["status"])
+    else:
+        res = fch["status"] if fch["status"] in _FILL_STATUS else "Atenção"
+        linha_verif("Fechamento GHI=DHI+DNI·cosθz", res,
+                    f"{fch['n_fora']} fora / {fch['n_avaliado']} avaliados")
+    # Concordância
+    if qc.concordancia_fontes is None:
+        linha_verif("Concordância McClear × NASA", "Não aplicável", "só uma fonte")
+    else:
+        c = qc.concordancia_fontes
+        res = "OK" if c["rmse_rel_pct"] < 5 else (
+            "Atenção" if c["rmse_rel_pct"] <= 15 else "Problemas"
+        )
+        linha_verif("Concordância McClear × NASA", res,
+                    f"RMSE {c['rmse']:.1f} ({c['rmse_rel_pct']:.1f}%) · "
+                    f"viés {c['mbe']:.1f} · r {c['r']:.3f}")
+
+    # NaN por coluna, se houver.
+    nan_itens = {k: v for k, v in qc.nan_por_coluna.items() if v}
+    if nan_itens:
+        linha += 1
+        _titulo_secao(ws, linha, "Valores ausentes (NaN) por coluna")
+        linha += 1
+        for col, qtd in nan_itens.items():
+            ws.cell(row=linha, column=1, value=col).font = _fonte_normal
+            ws.cell(row=linha, column=2, value=qtd).font = _fonte_normal
+            linha += 1
+
+    # Legenda dos critérios (autoexplicativa).
+    linha += 1
+    _titulo_secao(ws, linha, "Critérios e tolerâncias")
+    linha += 1
+    crit = qc.criterios
+    legenda = [
+        f"Envelope de céu limpo: real ≤ céu limpo × (1 + {crit.get('tolerancia_envelope', 0.1):.0%}).",
+        f"Fechamento: {crit.get('fechamento_tolerancia', '')} — "
+        "não aplicável em resolução diária/mensal (valores integrados).",
+        f"Negativos tolerados até {crit.get('negativo_tolerancia_whm2', -1)} Wh/m² (ruído).",
+        f"Concordância entre fontes: {crit.get('concordancia_faixas', '')}.",
+        "Geometria solar calculada com pvlib (ângulo zenital no ponto médio do período).",
+    ]
+    for texto in legenda:
+        cel = ws.cell(row=linha, column=1, value=texto)
+        cel.font = _fonte_legenda
+        ws.merge_cells(start_row=linha, start_column=1, end_row=linha, end_column=4)
+        linha += 1
+
+
+# ---------------------------------------------------------------------------
+# Aba "Reprodutibilidade" (proveniência + citações)
+# ---------------------------------------------------------------------------
+def _escrever_reprodutibilidade(ws: Worksheet, repro) -> None:
+    """Escreve a proveniência (chave→valor) e o bloco de citações."""
+    ws.column_dimensions["A"].width = 30
+    ws.column_dimensions["B"].width = 80
+
+    ws.merge_cells("A1:B1")
+    cel = ws["A1"]
+    cel.value = "Reprodutibilidade e Citações"
+    cel.font = _fonte_titulo
+    cel.alignment = _centro
+    for c in ws["A1:B1"][0]:
+        c.fill = _fill_azul
+
+    proveniencia = getattr(repro, "proveniencia", None) or {}
+    metodologia_pt = getattr(repro, "metodologia_pt", "")
+    metodologia_en = getattr(repro, "metodologia_en", "")
+    citacoes_md = getattr(repro, "citacoes_md", "")
+
+    linha = 3
+    _titulo_secao(ws, linha, "Proveniência da extração", larg=2)
+    linha += 1
+    for chave, valor in _achatar(proveniencia):
+        ws.cell(row=linha, column=1, value=chave).font = _fonte_rotulo
+        cel = ws.cell(row=linha, column=2, value=valor)
+        cel.font = _fonte_normal
+        cel.alignment = Alignment(wrap_text=True, vertical="top")
+        linha += 1
+
+    # Metodologia (PT/EN).
+    linha += 1
+    _titulo_secao(ws, linha, "Metodologia (PT / EN)", larg=2)
+    linha += 1
+    for texto in (metodologia_pt, metodologia_en):
+        ws.merge_cells(start_row=linha, start_column=1, end_row=linha, end_column=2)
+        cel = ws.cell(row=linha, column=1, value=texto)
+        cel.font = _fonte_normal
+        cel.alignment = Alignment(wrap_text=True, vertical="top")
+        ws.row_dimensions[linha].height = 60
+        linha += 1
+
+    # Citações / agradecimentos (uma linha por linha do Markdown).
+    linha += 1
+    _titulo_secao(ws, linha, "Referências e agradecimentos", larg=2)
+    linha += 1
+    for texto in citacoes_md.splitlines():
+        limpo = texto.lstrip("#> ").strip()
+        if not limpo:
+            continue
+        ws.merge_cells(start_row=linha, start_column=1, end_row=linha, end_column=2)
+        cel = ws.cell(row=linha, column=1, value=limpo)
+        cel.font = (
+            _fonte_rotulo if texto.startswith("#") or texto.startswith("**")
+            else _fonte_normal
+        )
+        cel.alignment = Alignment(wrap_text=True, vertical="top")
+        linha += 1
+
+
+def _achatar(d: dict, prefixo: str = "") -> list[tuple[str, str]]:
+    """Achata um dicionário aninhado em pares (chave legível, valor texto)."""
+    itens: list[tuple[str, str]] = []
+    for chave, valor in d.items():
+        nome = f"{prefixo}{chave}"
+        if isinstance(valor, dict):
+            itens.extend(_achatar(valor, f"{nome} · "))
+        elif isinstance(valor, list):
+            partes = []
+            for v in valor:
+                partes.append(v.get("nome", str(v)) if isinstance(v, dict) else str(v))
+            itens.append((nome, "; ".join(partes)))
+        else:
+            itens.append((nome, "" if valor is None else str(valor)))
+    return itens
 
 
 # ---------------------------------------------------------------------------

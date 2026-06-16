@@ -79,9 +79,10 @@ def _checar_excel(email: str) -> tuple[bool, str]:
 
         problemas: list[str] = []
         wb = load_workbook(caminho)
-        # O modelo oficial tem exatamente estas duas abas, nesta ordem.
-        if wb.sheetnames != ["Resumo", "Dados"]:
-            problemas.append(f"abas={wb.sheetnames} (esperado [Resumo, Dados])")
+        # Modelo oficial (Resumo, Dados) + abas de QC e reprodutibilidade.
+        esperadas = ["Resumo", "Dados", "Qualidade", "Reprodutibilidade"]
+        if wb.sheetnames != esperadas:
+            problemas.append(f"abas={wb.sheetnames} (esperado {esperadas})")
 
         # Tabela estruturada TabDados presente (as fórmulas dependem dela).
         if "TabDados" not in wb["Dados"].tables:
