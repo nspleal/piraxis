@@ -150,8 +150,8 @@ def _figura_series(df: pd.DataFrame) -> go.Figure:
             )
         )
     else:
-        cores = {"GHI": AZUL, "DNI": AMBAR, "DHI": "#6B8FB5", "BNI": "#C8822E"}
-        for comp in ("GHI", "DNI", "DHI", "BNI"):
+        cores = {"GHI": AZUL, "DNI": AMBAR, "DHI": "#6B8FB5", "BHI": "#C8822E"}
+        for comp in ("GHI", "DNI", "DHI", "BHI"):
             if comp in df.columns:
                 fig.add_trace(
                     go.Scatter(
@@ -549,7 +549,7 @@ if "combinado" in st.session_state:
     st.divider()
     tem_serie = any(
         c in combinado.columns
-        for c in ("GHI", "DNI", "DHI", "BNI", "GHI_McClear", "GHI_NASA")
+        for c in ("GHI", "DNI", "DHI", "BHI", "GHI_McClear", "GHI_NASA")
     )
     if tem_serie:
         st.plotly_chart(_figura_series(combinado), use_container_width=True)

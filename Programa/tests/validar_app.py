@@ -48,7 +48,7 @@ def _df_sintetico(*_args, **_kwargs) -> pd.DataFrame:
             "GHI": base.round(1),
             "DNI": (base * 1.2).round(1),
             "DHI": (base * 0.2).round(1),
-            "BNI": (base * 0.8).round(1),
+            "BHI": (base * 0.8).round(1),
         }
     )
 

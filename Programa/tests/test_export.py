@@ -31,7 +31,7 @@ def _df_uma_fonte(n_horas: int = 72) -> pd.DataFrame:
             "GHI": ghi.round(1),
             "DNI": (ghi * 1.3).round(1),
             "DHI": (ghi * 0.2).round(1),
-            "BNI": (ghi * 0.8).round(1),
+            "BHI": (ghi * 0.8).round(1),
         }
     )
 
@@ -75,7 +75,7 @@ def test_estrutura_basica_do_modelo(tmp_path):
     tab = ws.tables["TabDados"]
     assert tab.ref == "A1:E73"
     assert [c.name for c in tab.tableColumns] == [
-        "Timestamp", "GHI (W/m²)", "DNI (W/m²)", "DHI (W/m²)", "BNI (W/m²)",
+        "Timestamp", "GHI (W/m²)", "DNI (W/m²)", "DHI (W/m²)", "BHI (W/m²)",
     ]
     # Tabela auxiliar de Energia Diária (3 dias -> 3 linhas a partir de G25).
     assert ws["G24"].value == "Dia"
@@ -189,7 +189,7 @@ def test_abas_qualidade_e_reprodutibilidade(tmp_path):
     qc = analisar_qualidade(df, BOTUCATU, "PT01H", ["CAMS McClear"])
     repro = gerar_reprodutibilidade(
         BOTUCATU, date(2026, 1, 1), date(2026, 1, 3), "PT01H", "1 hora",
-        ["CAMS McClear"], ["GHI", "DNI", "DHI", "BNI"],
+        ["CAMS McClear"], ["GHI", "DNI", "DHI", "BHI"],
     )
     caminho = tmp_path / "saida_qc.xlsx"
     exporta(df, _metadados(), caminho, relatorio_qc=qc, reprodutibilidade=repro)

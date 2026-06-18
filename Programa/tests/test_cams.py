@@ -61,7 +61,7 @@ def test_parsing_e_normalizacao_colunas(mock_get_cams):
     df = fonte.buscar(BOTUCATU, date(2024, 1, 1), date(2024, 1, 1), "PT01H")
 
     assert list(df.columns)[0] == "timestamp"
-    for col in ("GHI", "DNI", "DHI", "BNI"):
+    for col in ("GHI", "DNI", "DHI", "BHI"):
         assert col in df.columns
 
     # Pedido de 1 dia em passo horário -> grade completa de 24 linhas.
@@ -70,7 +70,7 @@ def test_parsing_e_normalizacao_colunas(mock_get_cams):
     # Timestamp sem fuso (tz removido); valores localizados pelo horário.
     por_hora = df.set_index("timestamp")
     assert por_hora.loc["2024-01-01 10:00", "GHI"] == 520.0
-    assert por_hora.loc["2024-01-01 11:00", "BNI"] == 560.0  # bhi_clear -> BNI
+    assert por_hora.loc["2024-01-01 11:00", "BHI"] == 560.0  # bhi_clear -> BHI
 
 
 def test_email_invalido_lanca_erro():

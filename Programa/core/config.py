@@ -105,10 +105,10 @@ COMPONENTES_RADIACAO: dict[str, dict[str, str]] = {
         "unidade": "Wh/m²",
         "descricao": "Radiação difusa (espalhada pela atmosfera) numa superfície horizontal.",
     },
-    "BNI": {
-        "rotulo": "BNI — Irradiação Normal de Feixe",
+    "BHI": {
+        "rotulo": "BHI — Irradiância de Feixe Horizontal",
         "unidade": "Wh/m²",
-        "descricao": "Radiação de feixe normal (componente direta do McClear).",
+        "descricao": "Componente direta projetada na horizontal (do McClear).",
     },
 }
 

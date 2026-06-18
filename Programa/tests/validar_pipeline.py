@@ -44,7 +44,7 @@ from core.pipeline import extrair_mcclear_para_excel
 # Rótulos em português que devem aparecer na aba "Resumo".
 ROTULOS_RESUMO = ["Local", "Período", "Fontes usadas", "Passo temporal"]
 # Colunas da TabDados no formato do modelo oficial (passo horário -> W/m²).
-COLUNAS_RADIACAO = ["GHI (W/m²)", "DNI (W/m²)", "DHI (W/m²)", "BNI (W/m²)"]
+COLUNAS_RADIACAO = ["GHI (W/m²)", "DNI (W/m²)", "DHI (W/m²)", "BHI (W/m²)"]
 
 
 def _checar_erro_amigavel() -> tuple[bool, str]:

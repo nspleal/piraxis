@@ -24,7 +24,7 @@ EMAIL = "pesquisador@unesp.br"
 def test_proveniencia_campos_e_sem_email():
     prov = montar_proveniencia(
         BOTUCATU, date(2026, 6, 7), date(2026, 6, 9), "PT01H", "1 hora",
-        ["CAMS McClear", "NASA POWER"], ["GHI", "DNI", "DHI", "BNI"],
+        ["CAMS McClear", "NASA POWER"], ["GHI", "DNI", "DHI", "BHI"],
     )
     # Campos esperados.
     for chave in ("ferramenta", "data_extracao", "local", "periodo", "fontes",
@@ -44,7 +44,7 @@ def test_proveniencia_campos_e_sem_email():
 def test_metodologia_preenchida_com_valores_reais():
     repro = gerar_reprodutibilidade(
         BOTUCATU, date(2026, 6, 7), date(2026, 6, 9), "PT01H", "1 hora",
-        ["CAMS McClear", "NASA POWER"], ["GHI", "DNI", "DHI", "BNI"],
+        ["CAMS McClear", "NASA POWER"], ["GHI", "DNI", "DHI", "BHI"],
     )
     assert "Botucatu" in repro.metodologia_pt
     assert "07/06/2026" in repro.metodologia_pt
@@ -60,7 +60,7 @@ def test_citacoes_so_das_fontes_usadas():
     # Só McClear: não deve citar NASA; deve citar Copernicus, McClear e pvlib.
     repro = gerar_reprodutibilidade(
         BOTUCATU, date(2026, 6, 7), date(2026, 6, 9), "PT01H", "1 hora",
-        ["CAMS McClear"], ["GHI", "DNI", "DHI", "BNI"],
+        ["CAMS McClear"], ["GHI", "DNI", "DHI", "BHI"],
     )
     cit = repro.citacoes_md
     assert "Lefèvre" in cit
@@ -84,7 +84,7 @@ def test_citacoes_so_das_fontes_usadas():
 def test_geracao_dos_arquivos(tmp_path):
     repro = gerar_reprodutibilidade(
         BOTUCATU, date(2026, 6, 7), date(2026, 6, 9), "PT01H", "1 hora",
-        ["CAMS McClear", "NASA POWER"], ["GHI", "DNI", "DHI", "BNI"],
+        ["CAMS McClear", "NASA POWER"], ["GHI", "DNI", "DHI", "BHI"],
     )
     caminho_md, caminho_json = salvar_artefatos(repro, "estudo", tmp_path)
 

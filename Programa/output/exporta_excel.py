@@ -26,7 +26,7 @@ exatamente esta estrutura, com duas abas:
       · gráfico de barras de Energia Diária.
 
 Adaptações dinâmicas (o modelo foi desenhado para CAMS McClear horário com
-GHI/DNI/DHI/BNI; o exportador generaliza sem mudar o visual):
+GHI/DNI/DHI/BHI; o exportador generaliza sem mudar o visual):
   - as linhas de estatística acompanham os componentes presentes no DataFrame
     (ex.: extração só NASA, ou combinada com sufixos por fonte);
   - a coluna ``kt`` (índice de claridade, adimensional) entra na TabDados mas
@@ -515,7 +515,7 @@ def _escrever_resumo(
     cel = ws.cell(row=linha_legenda, column=6)
     cel.value = (
         "GHI: Global Horizontal · DNI: Direta Normal · DHI: Difusa Horizontal · "
-        f"BNI: Direta Normal (feixe) — irradiâncias em {unidade}"
+        f"BHI: Feixe Horizontal — irradiâncias em {unidade}"
     )
     cel.font = _fonte_legenda
 

@@ -17,7 +17,7 @@ Características do serviço (decisões já tomadas no projeto):
   - Autenticação pelo e-mail cadastrado E CONFIRMADO em soda-pro.com (não há
     chave de API). O e-mail é recebido no construtor, nunca de constante global.
   - Cobertura mundial -> cobre_local sempre True.
-  - Componentes retornados: GHI, DNI, DHI, BNI.
+  - Componentes retornados: GHI, DNI, DHI, BHI.
   - Atraso dos dados: a última data disponível é sempre hoje - 2 dias.
   - Limite de 100 requisições por dia por conta (por isso o cache-first).
 
@@ -67,14 +67,15 @@ ISO_PARA_PVLIB: dict[str, str] = {
 # Mapa de cada componente padrão do projeto para os possíveis nomes que a pvlib
 # devolve (com map_variables=True). Preferimos sempre a versão de CÉU LIMPO
 # ("*_clear"); caímos para a variante sem sufixo apenas por robustez entre
-# versões. Observação: "BHI" (feixe horizontal) do McClear corresponde ao
-# "BNI" do projeto. As colunas de radiação REAL do cams_radiation (ghi, dni,
-# ...) não entram nos componentes padrão (céu limpo) e ficam de fora.
+# versões. O componente padrão "BHI" (Beam Horizontal Irradiance — feixe
+# projetado na horizontal) vem de ``bhi_clear``, ficando autoconsistente. As
+# colunas de radiação REAL do cams_radiation (ghi, dni, ...) não entram nos
+# componentes padrão (céu limpo) e ficam de fora.
 CANDIDATOS_COMPONENTE: dict[str, tuple[str, ...]] = {
     "GHI": ("ghi_clear",),
     "DNI": ("dni_clear",),
     "DHI": ("dhi_clear",),
-    "BNI": ("bhi_clear",),
+    "BHI": ("bhi_clear",),
 }
 
 
@@ -289,7 +290,7 @@ class CamsMcClear(FonteRadiacao):
 
         A pvlib devolve os dados indexados por tempo e (com map_variables=True)
         com nomes em minúsculas. Aqui: o índice vira a coluna ``timestamp`` e os
-        componentes de CÉU LIMPO são renomeados para o padrão GHI/DNI/DHI/BNI,
+        componentes de CÉU LIMPO são renomeados para o padrão GHI/DNI/DHI/BHI,
         mantendo apenas timestamp + os componentes presentes. Colunas extras
         (ghi_extra, e — no cams_radiation — ghi/dni/... reais e Reliability)
         são ignoradas, pois esta fonte representa o céu limpo.

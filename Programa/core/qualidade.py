@@ -129,7 +129,7 @@ def _resolver_papeis(df: pd.DataFrame, nomes_fontes: list[str] | None) -> _Papei
         tem_clrsky = "GHI_ceu_limpo" in cols
         eh_nasa = tem_clrsky or "nasa" in nomes or "power" in nomes
         eh_mcclear = (
-            ("BNI" in cols and not tem_clrsky) or "mcclear" in nomes or "cams" in nomes
+            ("BHI" in cols and not tem_clrsky) or "mcclear" in nomes or "cams" in nomes
         )
         if eh_nasa and not (eh_mcclear and not tem_clrsky):
             p.ghi_real, p.dni_real, p.dhi_real = get("GHI"), get("DNI"), get("DHI")

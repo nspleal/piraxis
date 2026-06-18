@@ -10,7 +10,7 @@ classe que herde de ``FonteRadiacao`` e implemente ``buscar`` e ``cobre_local``.
 
 Contrato do DataFrame padronizado retornado por qualquer fonte:
   - uma coluna ``timestamp`` (datetime);
-  - uma coluna por componente disponível, nomeada EXATAMENTE GHI, DNI, DHI, BNI;
+  - uma coluna por componente disponível, nomeada EXATAMENTE GHI, DNI, DHI, BHI;
   - componentes não fornecidos pela fonte ficam AUSENTES (não inventar zeros).
 
 Inclui também utilidades de cache local compartilhadas pelas fontes concretas.
@@ -31,7 +31,7 @@ from core.config import CACHE_DIR
 logger = logging.getLogger(__name__)
 
 # Nomes padronizados das colunas de componentes (ordem canônica).
-COMPONENTES_PADRAO: tuple[str, ...] = ("GHI", "DNI", "DHI", "BNI")
+COMPONENTES_PADRAO: tuple[str, ...] = ("GHI", "DNI", "DHI", "BHI")
 
 # Frequência pandas correspondente a cada passo temporal ISO do projeto.
 # Usada para montar a grade completa de horários do período solicitado.
