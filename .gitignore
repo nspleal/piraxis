@@ -18,6 +18,9 @@
 **/venv/
 **/env/
 
+# Base de conhecimento externa (cofre/LLM Wiki) clonada localmente — nunca versionar aqui
+cofre/
+
 # Sistema operacional / editores
 .DS_Store
 .idea/
