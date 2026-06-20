@@ -18,6 +18,7 @@ Projeto acadêmico da UNESP; local padrão **Botucatu/SP** (−22.8867, −48.44
 - `core/qualidade.py` — QC físico (lacunas, negativos, noturno, envelope, fechamento, concordância).
 - `core/reprodutibilidade.py` — proveniência (.json), metodologia PT/EN e citações (sem e-mail).
 - `core/pipeline.py` — extração→Excel headless (sem UI), usado pela validação.
+- `core/conferencia.py` — auditoria + conferência de fidelidade (extração × CSV do site da SoDa, via `pvlib.read_cams`).
 - `sources/base.py` — `FonteRadiacao` (ABC) + cache + reindex da grade temporal.
 - `sources/cams_mcclear.py` — cliente McClear via `pvlib.iotools.get_cams` (cache-first, contador de API).
 - `sources/nasa_power.py` — cliente NASA POWER (REST, −999→NaN, normaliza unidade).
@@ -52,9 +53,11 @@ Projeto acadêmico da UNESP; local padrão **Botucatu/SP** (−22.8867, −48.44
   = a ordem diferia da SoDa → `COMPONENTES_PADRAO` reordenado para **GHI, BHI, DHI, DNI** (o **DNI** do
   projeto é o **BNI** da SoDa — mesmo dado, nome diferente). Teste de regressão em `tests/test_cams.py`.
   ⚠️ **Validar com rede real** na máquina do pesquisador.
-- **Pendente (prioridade científica; proposto, não feito):** **modo auditoria** (salvar a resposta
-  crua da fonte junto do Excel) + **ferramenta de conferência** (extração × download do site, linha a
-  linha) + **relatório de fidelidade**.
+- **✅ Auditoria/conferência — IMPLEMENTADO:** `core/conferencia.py` compara a extração com o CSV
+  baixado do site (via `pvlib.read_cams`) e gera um **relatório de fidelidade** (status + Δ por
+  componente, alinhado por timestamp). No app: aba "🔬 Conferência com o site" (sobe o CSV → relatório
+  + download `.md`) e download das **respostas cruas** das fontes (auditoria). As fontes guardam a
+  resposta crua em `self.resposta_crua`. Testes em `tests/test_conferencia.py`.
 - **Ambiente de nuvem:** sem rede para a API SoDa e sem e-mail → validações de API ficam PULADAS aqui;
   confirme na máquina local do pesquisador.
 

@@ -40,7 +40,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from core import credenciais
+from core import conferencia, credenciais
 from core.combinador import combinar
 from core.config import BOTUCATU, PASSOS_TEMPORAIS
 from core.qualidade import analisar_qualidade
@@ -348,6 +348,7 @@ if extrair:
         feitas = 0
 
         try:
+            brutos: dict[str, object] = {}
             with st.spinner("Consultando fontes de radiação…"):
                 if usar_nasa:
                     progresso.progress(
@@ -357,6 +358,8 @@ if extrair:
                     resultados[fonte.nome] = fonte.buscar(
                         local, data_inicio, data_fim, passo_temporal
                     )
+                    if getattr(fonte, "resposta_crua", None) is not None:
+                        brutos[fonte.nome] = fonte.resposta_crua
                     passos[fonte.nome] = passo_temporal
                     feitas += 1
                     progresso.progress(feitas / n_fontes)
@@ -369,6 +372,8 @@ if extrair:
                     resultados[fonte.nome] = fonte.buscar(
                         local, data_inicio, data_fim, passo_temporal
                     )
+                    if getattr(fonte, "resposta_crua", None) is not None:
+                        brutos[fonte.nome] = fonte.resposta_crua
                     passos[fonte.nome] = passo_temporal
                     feitas += 1
                     progresso.progress(feitas / n_fontes)
@@ -378,6 +383,7 @@ if extrair:
 
             # Guarda na sessão para o download e a pré-visualização.
             st.session_state["combinado"] = combinado
+            st.session_state["brutos"] = brutos
             st.session_state["metadados"] = {
                 "local": local.nome,
                 "latitude": local.latitude,
@@ -555,6 +561,91 @@ if "combinado" in st.session_state:
                 file_name=f"{base_nome}_proveniencia.json",
                 mime="application/json",
             )
+
+    # --- Conferência com o site (fidelidade) e auditoria ------------------
+    with st.expander("🔬 Conferência com o site (fidelidade) e auditoria"):
+        st.caption(
+            "Para comprovar que a extração reproduz a fonte: baixe na SoDa o CSV "
+            "do CAMS McClear para o MESMO ponto e período (em UTC) e suba aqui. A "
+            "ferramenta compara linha a linha e gera o relatório de fidelidade."
+        )
+        data_ini2, data_f2, nome_loc2 = st.session_state["periodo_arquivo"]
+        base_nome2 = nome_arquivo_saida(nome_loc2, data_ini2, data_f2).stem
+
+        arquivo_site = st.file_uploader(
+            "CSV do CAMS McClear baixado da SoDa", type=["csv"], key="conf_csv"
+        )
+        tem_mcclear = any(c in combinado.columns for c in ("GHI", "GHI_McClear"))
+        if arquivo_site is not None and not tem_mcclear:
+            st.info(
+                "A conferência atual é do CAMS McClear — inclua o McClear na "
+                "extração para comparar."
+            )
+        elif arquivo_site is not None:
+            import tempfile
+
+            try:
+                with tempfile.NamedTemporaryFile(
+                    "wb", suffix=".csv", delete=False
+                ) as tmp:
+                    tmp.write(arquivo_site.getvalue())
+                    caminho_tmp = tmp.name
+                referencia = conferencia.parsear_mcclear_site(caminho_tmp)
+                rel = conferencia.comparar(combinado, referencia, "CAMS McClear")
+            except Exception as exc:  # pragma: no cover - robustez de UI
+                st.error(
+                    "Não consegui ler esse arquivo como CSV do McClear da SoDa. "
+                    f"Baixe no formato CSV padrão do site. Detalhe técnico: {exc}"
+                )
+            else:
+                icone = {
+                    "Idêntico": "✅", "Diferenças pequenas": "⚠️",
+                    "Diferenças relevantes": "❌", "Sem sobreposição": "❌",
+                }.get(rel.status, "ℹ️")
+                st.markdown(f"**Fidelidade: {icone} {rel.status}**")
+                st.text(rel.resumo_texto)
+                if rel.por_componente:
+                    st.dataframe(
+                        pd.DataFrame(rel.por_componente).T,
+                        use_container_width=True,
+                    )
+                st.download_button(
+                    "⬇️ Baixar relatório de fidelidade (.md)",
+                    data=conferencia.formatar_relatorio_md(rel).encode("utf-8"),
+                    file_name=f"{base_nome2}_fidelidade.md",
+                    mime="text/markdown",
+                )
+
+        # Auditoria: respostas CRUAS das fontes (quando vieram da rede).
+        brutos = st.session_state.get("brutos") or {}
+        if brutos:
+            st.markdown("**Auditoria — respostas cruas da fonte**")
+            st.caption(
+                "Exatamente o que a fonte devolveu nesta extração, antes do "
+                "processamento. Fica vazio quando a extração veio do cache."
+            )
+            import json as _json_audit
+
+            for nome_fonte, bruto in brutos.items():
+                slug = nome_fonte.replace(" ", "_")
+                if isinstance(bruto, pd.DataFrame):
+                    st.download_button(
+                        f"⬇️ {nome_fonte} — resposta crua (.csv)",
+                        data=bruto.to_csv().encode("utf-8"),
+                        file_name=f"{base_nome2}_cru_{slug}.csv",
+                        mime="text/csv",
+                        key=f"cru_{slug}",
+                    )
+                else:
+                    st.download_button(
+                        f"⬇️ {nome_fonte} — resposta crua (.json)",
+                        data=_json_audit.dumps(
+                            bruto, ensure_ascii=False, indent=2
+                        ).encode("utf-8"),
+                        file_name=f"{base_nome2}_cru_{slug}.json",
+                        mime="application/json",
+                        key=f"cru_{slug}",
+                    )
 
     # --- Gráficos ----------------------------------------------------------
     st.divider()
