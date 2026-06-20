@@ -62,6 +62,8 @@ class NasaPower(FonteRadiacao):
 
     def __init__(self, timeout: int = 60) -> None:
         self.timeout = timeout
+        # JSON CRU da última chamada REAL à API (auditoria); None em cache.
+        self.resposta_crua = None
 
     def cobre_local(self, local) -> bool:
         """Cobertura global: True para qualquer lat/lon válida."""
@@ -118,7 +120,9 @@ class NasaPower(FonteRadiacao):
                 "com a internet e tente novamente."
             ) from exc
 
-        df = self._parsear_json(resposta.json(), diario=diario)
+        bruto = resposta.json()
+        self.resposta_crua = bruto  # JSON cru para auditoria
+        df = self._parsear_json(bruto, diario=diario)
         # Garante a grade completa do período (horas faltantes viram NaN).
         df = self._reindexar_periodo(df, data_inicio, data_fim, passo_temporal)
         df = self._padronizar_colunas(df)

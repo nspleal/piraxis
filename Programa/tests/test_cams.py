@@ -90,6 +90,14 @@ def test_altitude_srtm_e_ordem_das_colunas(mock_get_cams):
     assert list(df.columns) == ["timestamp", "GHI", "BHI", "DHI", "DNI"]
 
 
+def test_resposta_crua_capturada_para_auditoria(mock_get_cams):
+    """A resposta crua da pvlib fica disponível para a auditoria/conferência."""
+    fonte = CamsMcClear(EMAIL_TESTE)
+    fonte.buscar(BOTUCATU, date(2024, 1, 1), date(2024, 1, 1), "PT01H")
+    assert fonte.resposta_crua is not None
+    assert "ghi_clear" in fonte.resposta_crua.columns
+
+
 def test_email_invalido_lanca_erro():
     fonte = CamsMcClear("")  # e-mail vazio
     with pytest.raises(ValueError, match="conta SoDa"):

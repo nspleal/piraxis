@@ -158,6 +158,18 @@ def test_requisicao_pede_fuso_utc():
 
 
 @responses.activate
+def test_resposta_crua_capturada_para_auditoria():
+    """O JSON cru da NASA POWER fica disponível para a auditoria."""
+    responses.add(
+        responses.GET, ENDPOINT_HORARIO, json=_payload_horario(), status=200
+    )
+    fonte = NasaPower()
+    fonte.buscar(BOTUCATU, date(2024, 1, 1), date(2024, 1, 1), "PT01H")
+    assert fonte.resposta_crua is not None
+    assert "properties" in fonte.resposta_crua
+
+
+@responses.activate
 def test_cache_evita_segunda_chamada():
     """A segunda extração idêntica deve ler do cache, sem nova chamada HTTP."""
     responses.add(

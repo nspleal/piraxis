@@ -106,6 +106,8 @@ class CamsMcClear(FonteRadiacao):
                 f"Use um de {IDENTIFICADORES_VALIDOS}."
             )
         self.identifier = identifier
+        # Resposta CRUA da última chamada REAL à API (auditoria); None em cache.
+        self.resposta_crua = None
 
     def cobre_local(self, local) -> bool:
         """Cobertura mundial: sempre True."""
@@ -232,6 +234,8 @@ class CamsMcClear(FonteRadiacao):
             )
         except Exception as exc:  # noqa: BLE001 - traduzimos para erro amigável
             raise RuntimeError(self._mensagem_erro_amigavel(exc)) from exc
+        # Guarda a resposta crua para auditoria (conferência com o site).
+        self.resposta_crua = dados
         return dados
 
     @staticmethod
