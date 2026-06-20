@@ -47,6 +47,7 @@ def mock_get_cams(monkeypatch):
 
     def fake_get_cams(*args, **kwargs):
         chamadas["n"] += 1
+        chamadas["kwargs"] = kwargs
         return _resposta_pvlib()
 
     import pvlib
@@ -71,6 +72,22 @@ def test_parsing_e_normalizacao_colunas(mock_get_cams):
     por_hora = df.set_index("timestamp")
     assert por_hora.loc["2024-01-01 10:00", "GHI"] == 520.0
     assert por_hora.loc["2024-01-01 11:00", "BHI"] == 560.0  # bhi_clear -> BHI
+
+
+def test_altitude_srtm_e_ordem_das_colunas(mock_get_cams):
+    """Regressão (incoerência do CAMS relatada): a requisição deve usar a
+    altitude estimada pela fonte (SRTM, igual ao site da SoDa) e as colunas
+    devem sair na ordem do arquivo da SoDa (GHI, BHI, DHI, DNI/BNI).
+    """
+    fonte = CamsMcClear(EMAIL_TESTE)
+    df = fonte.buscar(BOTUCATU, date(2024, 1, 1), date(2024, 1, 1), "PT01H")
+
+    # Altitude enviada ao SoDa é None -> a fonte estima via SRTM, batendo com o
+    # download oficial do site (antes era fixada em 786 m e deslocava os valores).
+    assert mock_get_cams["kwargs"]["altitude"] is None
+
+    # Ordem das colunas espelha o arquivo da SoDa (DNI = "BNI" da SoDa).
+    assert list(df.columns) == ["timestamp", "GHI", "BHI", "DHI", "DNI"]
 
 
 def test_email_invalido_lanca_erro():

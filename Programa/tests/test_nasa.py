@@ -136,6 +136,28 @@ def test_grade_completa_quando_fonte_traz_dados_parciais():
 
 
 @responses.activate
+def test_requisicao_pede_fuso_utc():
+    """A requisição DEVE pedir time-standard=UTC para alinhar com o McClear.
+
+    Regressão: por padrão a NASA POWER entrega LST (hora solar local), o que
+    desalinhava as fontes em ~3 h em Botucatu (kt sem sentido, picos em horas
+    erradas). O cliente precisa fixar UTC explicitamente.
+    """
+    responses.add(
+        responses.GET, ENDPOINT_HORARIO, json=_payload_horario(), status=200
+    )
+
+    fonte = NasaPower()
+    fonte.buscar(BOTUCATU, date(2024, 1, 1), date(2024, 1, 1), "PT01H")
+
+    assert len(responses.calls) == 1
+    url = responses.calls[0].request.url
+    assert "time-standard=UTC" in url, (
+        f"A requisição não fixou o fuso UTC; URL gerada: {url}"
+    )
+
+
+@responses.activate
 def test_cache_evita_segunda_chamada():
     """A segunda extração idêntica deve ler do cache, sem nova chamada HTTP."""
     responses.add(

@@ -30,8 +30,22 @@ from core.config import CACHE_DIR
 
 logger = logging.getLogger(__name__)
 
-# Nomes padronizados das colunas de componentes (ordem canônica).
-COMPONENTES_PADRAO: tuple[str, ...] = ("GHI", "DNI", "DHI", "BHI")
+# Nomes padronizados das colunas de componentes, NA ORDEM do arquivo do site da
+# SoDa/CAMS McClear (GHI, BHI, DHI, BNI), para facilitar a conferência coluna a
+# coluna com o download oficial. Obs.: o "DNI" do projeto é o "BNI" da SoDa
+# (irradiância de feixe normal) — mesmo dado, nome diferente.
+COMPONENTES_PADRAO: tuple[str, ...] = ("GHI", "BHI", "DHI", "DNI")
+
+# Versão do ESQUEMA do cache. Faz parte da chave de cache: ao incrementar, todos
+# os arquivos de cache antigos passam a ser ignorados (nunca lidos), evitando que
+# respostas gravadas por uma versão anterior — com unidade, fuso, altitude ou
+# nomes/ordem de coluna diferentes — mascarem correções. Histórico:
+#   v1: formato original.
+#   v2: NASA POWER passou a ser coletada em UTC (time-standard=UTC) e a
+#       renomeação "BNI" -> "BHI"; caches anteriores são incompatíveis.
+#   v3: CAMS McClear passa a usar a altitude estimada pela fonte (SRTM, igual ao
+#       site) e a ordem de colunas passou a espelhar a SoDa (GHI, BHI, DHI, DNI).
+CACHE_SCHEMA = "3"
 
 # Frequência pandas correspondente a cada passo temporal ISO do projeto.
 # Usada para montar a grade completa de horários do período solicitado.
@@ -85,6 +99,7 @@ class FonteRadiacao(ABC):
         """
         bruto = "|".join(
             [
+                CACHE_SCHEMA,
                 self.nome,
                 local.nome,
                 f"{local.latitude:.4f}",

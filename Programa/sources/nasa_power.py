@@ -15,6 +15,15 @@ Mapeamento de parâmetros NASA -> nomes padrão do projeto:
 Unidades: a NASA POWER retorna, na comunidade RE em passo horário, valores em
 Wh/m² por passo. Documentamos e normalizamos para Wh/m² (ver _para_wh_m2).
 Valores ausentes vêm como -999 e são convertidos para NaN.
+
+Fuso horário (CRÍTICO): a NASA POWER entrega os dados em LST (Local Solar Time
+— hora solar local) por PADRÃO, tanto no passo horário quanto no diário. O CAMS
+McClear é coletado em UTC (``time_ref="UT"``) e TODO o restante do projeto
+(grade temporal, controle de qualidade e suíte de validação) pressupõe UTC. Por
+isso solicitamos explicitamente ``time-standard=UTC`` na requisição: sem isso,
+as duas fontes ficam desalinhadas em ~3 h em Botucatu, produzindo um índice de
+claridade (kt) sem sentido físico e picos de radiação em horas erradas — a
+"incoerência" relatada na comparação com os sites das fontes.
 """
 
 from __future__ import annotations
@@ -88,6 +97,9 @@ class NasaPower(FonteRadiacao):
             "longitude": local.longitude,
             "start": data_inicio.strftime("%Y%m%d"),
             "end": data_fim.strftime("%Y%m%d"),
+            # Alinha o fuso ao McClear (UTC). Sem isto, a NASA POWER usaria o
+            # padrão LST e as fontes ficariam ~3 h fora de fase. Ver docstring.
+            "time-standard": "UTC",
         }
 
         logger.info(
