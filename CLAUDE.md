@@ -35,18 +35,32 @@ Projeto acadêmico da UNESP; local padrão **Botucatu/SP** (−22.8867, −48.44
 
 ## 4. Estado e KNOWN ISSUES (desta sessão; podem não estar no código)
 - **Renomeação BNI→BHI** concluída: o 4º componente é **Feixe Horizontal** (`bhi_clear`).
-  Caches antigos com coluna "BNI" são incompatíveis — **limpe `Programa/cache/`** ao atualizar.
-- **🔴 INVESTIGAÇÃO ABERTA — incoerência dos dados:** o pesquisador relatou uma extração
-  "incoerente". Causa ainda **não confirmada**; suspeitas em ordem:
-  1. **cache antigo** (formato BNI) → testar apagando `Programa/cache/` e reextrair;
-  2. **unidade/fuso na comparação** com o site (W/m² × Wh/m²; UTC × local);
-  3. datas muito recentes → células vazias (esperado);
-  4. possível bug real a confirmar com os dados do usuário.
-  - Pendente de implementar (proposto, não feito): **modo auditoria** (salvar a resposta crua da
-    fonte junto do Excel) + **ferramenta de conferência** (comparar a extração com um download do
-    site, linha a linha) + **relatório de fidelidade**. É prioridade do pesquisador (uso científico).
+- **Cache versionado:** a chave de cache inclui `CACHE_SCHEMA` (`sources/base.py`). Ao mudar o
+  formato dos dados (unidade, fuso, nomes de coluna), **incremente a versão** — caches antigos passam
+  a ser ignorados sozinhos (**não precisa apagar `Programa/cache/` na mão**). Versão atual: **2**
+  (NASA em UTC + renomeação BHI).
+- **✅ Incoerência dos dados — CAUSA CONFIRMADA E CORRIGIDA (fuso horário):** a **NASA POWER** entrega
+  **LST (hora solar local)** por padrão, enquanto o **McClear é UTC** e todo o projeto (grade, QC,
+  validação) pressupõe UTC → as fontes ficavam **~3 h fora de fase** em Botucatu (kt sem sentido,
+  picos deslocados). **Fix:** `sources/nasa_power.py` envia `time-standard=UTC` (horário e diário);
+  o cache versionado impede que respostas antigas (LST) mascarem a correção; o app deixa explícito
+  que os horários são **UTC**. Teste de regressão em `tests/test_nasa.py`. ⚠️ **Validar com rede real**
+  na máquina do pesquisador.
+- **Pendente (prioridade científica; proposto, não feito):** **modo auditoria** (salvar a resposta
+  crua da fonte junto do Excel) + **ferramenta de conferência** (extração × download do site, linha a
+  linha) + **relatório de fidelidade**.
 - **Ambiente de nuvem:** sem rede para a API SoDa e sem e-mail → validações de API ficam PULADAS aqui;
   confirme na máquina local do pesquisador.
+
+## 5. Modo de trabalho (autonomia acordada com o pesquisador)
+- **Autonomia:** ao fazer uma mudança, rode a verificação (`python -m pytest`; `validar_*.py` quando
+  fizer sentido) e, **se passar**, **committe e pushe na branch de trabalho** sem pedir confirmação.
+  Mantenha docs/estado **atualizados proativamente** (este arquivo inclusive).
+- **Sem teste cobrindo a mudança:** adicione um; se não for viável, **avise** em vez de empurrar no
+  escuro. **Se um teste falhar:** não pushe — corrija ou reporte.
+- **Sempre confirmar antes:** abrir/mergear **Pull Request para `main`** (nunca criar PR sozinho) e
+  ações **irreversíveis** (apagar/sobrescrever o que não criou, reescrever histórico, `force-push`).
+- **Cofre (`obsidian`):** **somente leitura** — nunca editar/commitar/pushar (ver bloco abaixo).
 
 ------------------------------------------------------------------
 ## Base de conhecimento do projeto — cofre (LLM Wiki, SOMENTE LEITURA)
