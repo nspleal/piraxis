@@ -215,11 +215,16 @@ class CamsMcClear(FonteRadiacao):
                 end=pd.Timestamp(data_fim),
                 email=self.email,
                 identifier=self.identifier,
-                # Altitude SEMPRE estimada pela fonte (SoDa via SRTM), enviando
-                # None — é o que o site da SoDa faz por padrão, então a extração
-                # bate EXATAMENTE com o download oficial. Fixar a altitude do
-                # projeto (ex.: 786 m) deslocava levemente os valores de céu limpo.
-                altitude=None,
+                # Altitude: envia a altitude CONFIGURADA do ponto (ex.: 786 m em
+                # Botucatu) para bater EXATAMENTE com o site — o download oficial
+                # registra a altitude usada no cabeçalho ("Altitude (m): 786.00").
+                # Use a MESMA altitude no formulário da SoDa. Só cai em None
+                # (SoDa estima via SRTM) quando a altitude não é informada (≤ 0).
+                altitude=(
+                    local.altitude
+                    if local.altitude and local.altitude > 0
+                    else None
+                ),
                 time_step=time_step,
                 # UTC. A NASA POWER é alinhada ao mesmo fuso via
                 # time-standard=UTC (ver sources/nasa_power.py); todo o projeto

@@ -279,9 +279,9 @@ with st.sidebar:
     )
     altitude = st.number_input(
         "Altitude (m)", value=BOTUCATU.altitude, format="%.1f",
-        help="Informativo. O CAMS McClear estima a altitude pela própria fonte "
-             "(SRTM), igual ao site da SoDa, para a extração bater com o "
-             "download oficial.",
+        help="Para a extração bater 100% com o site, use no formulário da SoDa "
+             "exatamente esta mesma altitude. Se deixar 0 (ou em branco), a "
+             "fonte estima pelo SRTM.",
     )
 
     st.subheader("📅 Período")
@@ -590,8 +590,10 @@ if "combinado" in st.session_state:
                 ) as tmp:
                     tmp.write(arquivo_site.getvalue())
                     caminho_tmp = tmp.name
-                referencia = conferencia.parsear_mcclear_site(caminho_tmp)
-                rel = conferencia.comparar(combinado, referencia, "CAMS McClear")
+                meta_alt = (st.session_state.get("metadados") or {}).get("altitude")
+                rel = conferencia.conferir_mcclear(
+                    combinado, caminho_tmp, altitude_extracao=meta_alt
+                )
             except Exception as exc:  # pragma: no cover - robustez de UI
                 st.error(
                     "Não consegui ler esse arquivo como CSV do McClear da SoDa. "
@@ -603,6 +605,8 @@ if "combinado" in st.session_state:
                     "Diferenças relevantes": "❌", "Sem sobreposição": "❌",
                 }.get(rel.status, "ℹ️")
                 st.markdown(f"**Fidelidade: {icone} {rel.status}**")
+                for aviso in rel.avisos:
+                    st.warning("⚠️ " + aviso)
                 st.text(rel.resumo_texto)
                 if rel.por_componente:
                     st.dataframe(

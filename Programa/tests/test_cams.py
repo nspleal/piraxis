@@ -74,17 +74,18 @@ def test_parsing_e_normalizacao_colunas(mock_get_cams):
     assert por_hora.loc["2024-01-01 11:00", "BHI"] == 560.0  # bhi_clear -> BHI
 
 
-def test_altitude_srtm_e_ordem_das_colunas(mock_get_cams):
-    """Regressão (incoerência do CAMS relatada): a requisição deve usar a
-    altitude estimada pela fonte (SRTM, igual ao site da SoDa) e as colunas
-    devem sair na ordem do arquivo da SoDa (GHI, BHI, DHI, DNI/BNI).
+def test_altitude_do_ponto_e_ordem_das_colunas(mock_get_cams):
+    """Regressão: a requisição deve usar a altitude CONFIGURADA do ponto (a mesma
+    que o site registra no cabeçalho), para fidelidade exata, e as colunas devem
+    sair na ordem do arquivo da SoDa (GHI, BHI, DHI, DNI/BNI).
     """
     fonte = CamsMcClear(EMAIL_TESTE)
     df = fonte.buscar(BOTUCATU, date(2024, 1, 1), date(2024, 1, 1), "PT01H")
 
-    # Altitude enviada ao SoDa é None -> a fonte estima via SRTM, batendo com o
-    # download oficial do site (antes era fixada em 786 m e deslocava os valores).
-    assert mock_get_cams["kwargs"]["altitude"] is None
+    # Altitude enviada ao SoDa = altitude do ponto (Botucatu = 786 m), batendo com
+    # o download oficial (que registra "Altitude (m): 786.00"). Antes (regressão)
+    # era None/SRTM e ficava ~0,2% off.
+    assert mock_get_cams["kwargs"]["altitude"] == BOTUCATU.altitude
 
     # Ordem das colunas espelha o arquivo da SoDa (DNI = "BNI" da SoDa).
     assert list(df.columns) == ["timestamp", "GHI", "BHI", "DHI", "DNI"]
