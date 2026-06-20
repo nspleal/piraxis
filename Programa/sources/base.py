@@ -33,6 +33,15 @@ logger = logging.getLogger(__name__)
 # Nomes padronizados das colunas de componentes (ordem canônica).
 COMPONENTES_PADRAO: tuple[str, ...] = ("GHI", "DNI", "DHI", "BHI")
 
+# Versão do ESQUEMA do cache. Faz parte da chave de cache: ao incrementar, todos
+# os arquivos de cache antigos passam a ser ignorados (nunca lidos), evitando que
+# respostas gravadas por uma versão anterior — com unidade, fuso ou nomes de
+# coluna diferentes — mascarem correções. Histórico:
+#   v1: formato original.
+#   v2: NASA POWER passou a ser coletada em UTC (time-standard=UTC) e a
+#       renomeação "BNI" -> "BHI"; caches anteriores são incompatíveis.
+CACHE_SCHEMA = "2"
+
 # Frequência pandas correspondente a cada passo temporal ISO do projeto.
 # Usada para montar a grade completa de horários do período solicitado.
 FREQ_POR_PASSO: dict[str, str] = {
@@ -85,6 +94,7 @@ class FonteRadiacao(ABC):
         """
         bruto = "|".join(
             [
+                CACHE_SCHEMA,
                 self.nome,
                 local.nome,
                 f"{local.latitude:.4f}",

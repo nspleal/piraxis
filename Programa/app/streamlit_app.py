@@ -421,6 +421,12 @@ if extrair:
                 f"✓ Extração concluída: {len(combinado)} registros de "
                 f"{data_inicio:%d/%m/%Y} a {data_fim:%d/%m/%Y}."
             )
+            st.caption(
+                "🕒 Todos os horários estão em **UTC** (Tempo Universal "
+                "Coordenado), igual nas duas fontes. Botucatu está em UTC−3, "
+                "então o meio-dia solar local aparece por volta das 15h UTC. "
+                "Ao comparar com o site de uma fonte, use o mesmo fuso (UTC)."
+            )
 
             # Avisa se muitos valores vieram vazios (típico de datas recentes,
             # cujos dados ainda não foram totalmente processados pelas fontes).

@@ -219,6 +219,9 @@ class CamsMcClear(FonteRadiacao):
                     else None
                 ),
                 time_step=time_step,
+                # UTC. A NASA POWER é alinhada ao mesmo fuso via
+                # time-standard=UTC (ver sources/nasa_power.py); todo o projeto
+                # — grade, QC e validação — pressupõe UTC.
                 time_ref="UT",
                 verbose=False,
                 # Valores integrados (Wh/m² por passo). No passo horário isso é
