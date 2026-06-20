@@ -38,8 +38,8 @@ Projeto acadêmico da UNESP; local padrão **Botucatu/SP** (−22.8867, −48.44
 - **Renomeação BNI→BHI** concluída: o 4º componente é **Feixe Horizontal** (`bhi_clear`).
 - **Cache versionado:** a chave de cache inclui `CACHE_SCHEMA` (`sources/base.py`). Ao mudar o
   formato dos dados (unidade, fuso, nomes de coluna), **incremente a versão** — caches antigos passam
-  a ser ignorados sozinhos (**não precisa apagar `Programa/cache/` na mão**). Versão atual: **3**
-  (NASA em UTC; CAMS com altitude SRTM; ordem de colunas GHI/BHI/DHI/DNI).
+  a ser ignorados sozinhos (**não precisa apagar `Programa/cache/` na mão**). Versão atual: **4**
+  (NASA em UTC; CAMS com a **altitude do ponto** — igual ao site; ordem de colunas GHI/BHI/DHI/DNI).
 - **✅ Incoerência dos dados — CAUSA CONFIRMADA E CORRIGIDA (fuso horário):** a **NASA POWER** entrega
   **LST (hora solar local)** por padrão, enquanto o **McClear é UTC** e todo o projeto (grade, QC,
   validação) pressupõe UTC → as fontes ficavam **~3 h fora de fase** em Botucatu (kt sem sentido,
@@ -48,16 +48,19 @@ Projeto acadêmico da UNESP; local padrão **Botucatu/SP** (−22.8867, −48.44
   que os horários são **UTC**. Teste de regressão em `tests/test_nasa.py`. ⚠️ **Validar com rede real**
   na máquina do pesquisador.
 - **✅ Incoerência do CAMS McClear — CORRIGIDA (altitude + ordem de colunas):** (a) **valores
-  levemente off** porque a altitude era fixada em 786 m, mas o site da SoDa usa **SRTM** → o cliente
-  agora envia `altitude=None` (SRTM), batendo exato com o download oficial; (b) **"colunas trocadas"**
-  = a ordem diferia da SoDa → `COMPONENTES_PADRAO` reordenado para **GHI, BHI, DHI, DNI** (o **DNI** do
-  projeto é o **BNI** da SoDa — mesmo dado, nome diferente). Teste de regressão em `tests/test_cams.py`.
-  ⚠️ **Validar com rede real** na máquina do pesquisador.
+  levemente off = ALTITUDE.** O download do site registra a altitude usada no cabeçalho (ex.: `Altitude
+  (m): 786.00`). O cliente envia a **altitude configurada do ponto** (786 m), **não SRTM**, para bater
+  exato — **use a MESMA altitude no formulário da SoDa** (cai em SRTM só se a altitude for ≤ 0). ⚠️ Isto
+  REVERTEU a tentativa anterior de usar SRTM, que deixava ~0,2% de diferença. (b) **"colunas trocadas"**
+  = a ordem diferia da SoDa → `COMPONENTES_PADRAO` = **GHI, BHI, DHI, DNI** (o **DNI** do projeto é o
+  **BNI** da SoDa). Regressão em `tests/test_cams.py`. ⚠️ **Validar com rede real**.
 - **✅ Auditoria/conferência — IMPLEMENTADO:** `core/conferencia.py` compara a extração com o CSV
   baixado do site (via `pvlib.read_cams`) e gera um **relatório de fidelidade** (status + Δ por
   componente, alinhado por timestamp). No app: aba "🔬 Conferência com o site" (sobe o CSV → relatório
   + download `.md`) e download das **respostas cruas** das fontes (auditoria). As fontes guardam a
-  resposta crua em `self.resposta_crua`. Testes em `tests/test_conferencia.py`.
+  resposta crua em `self.resposta_crua`. A conferência **detecta e decodifica sozinha** um CSV aberto/
+  salvo no Excel pt-BR (ponto decimal vira separador de milhar → valores ~10.000× maiores) e **avisa**
+  quando a altitude do site difere da extração. Testes em `tests/test_conferencia.py`.
 - **Ambiente de nuvem:** sem rede para a API SoDa e sem e-mail → validações de API ficam PULADAS aqui;
   confirme na máquina local do pesquisador.
 

@@ -43,9 +43,10 @@ COMPONENTES_PADRAO: tuple[str, ...] = ("GHI", "BHI", "DHI", "DNI")
 #   v1: formato original.
 #   v2: NASA POWER passou a ser coletada em UTC (time-standard=UTC) e a
 #       renomeação "BNI" -> "BHI"; caches anteriores são incompatíveis.
-#   v3: CAMS McClear passa a usar a altitude estimada pela fonte (SRTM, igual ao
-#       site) e a ordem de colunas passou a espelhar a SoDa (GHI, BHI, DHI, DNI).
-CACHE_SCHEMA = "3"
+#   v3: ordem de colunas passou a espelhar a SoDa (GHI, BHI, DHI, DNI).
+#   v4: CAMS McClear usa a altitude CONFIGURADA do ponto (ex.: 786 m), igual ao
+#       site, para fidelidade exata (a v3 usava SRTM e ficava ~0,2% off).
+CACHE_SCHEMA = "4"
 
 # Frequência pandas correspondente a cada passo temporal ISO do projeto.
 # Usada para montar a grade completa de horários do período solicitado.

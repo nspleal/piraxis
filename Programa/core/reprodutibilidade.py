@@ -196,8 +196,8 @@ def gerar_metodologia(
         pt += (
             "A irradiância em condições de céu limpo foi estimada pelo modelo "
             "CAMS McClear (Lefèvre et al., 2013; Gschwind et al., 2019), "
-            "acessado via serviço SoDa, com a altitude do ponto estimada "
-            "automaticamente (SRTM), como no site oficial. "
+            "acessado via serviço SoDa, usando a altitude do ponto informada "
+            "(a mesma registrada no download oficial do site). "
         )
     if usou_nasa:
         pt += "A irradiância em céu real foi obtida da base NASA POWER. "
@@ -218,8 +218,8 @@ def gerar_metodologia(
         en += (
             "Clear-sky irradiance was estimated using the CAMS McClear model "
             "(Lefèvre et al., 2013; Gschwind et al., 2019), accessed through the "
-            "SoDa service, with the site altitude estimated automatically (SRTM), "
-            "as on the official website. "
+            "SoDa service, using the informed site altitude (the same recorded in "
+            "the official site download). "
         )
     if usou_nasa:
         en += "All-sky (real) irradiance was retrieved from the NASA POWER database. "

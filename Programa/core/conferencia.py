@@ -24,6 +24,7 @@ Notas de comparabilidade (devem casar com a extração da ferramenta):
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -63,6 +64,7 @@ class RelatorioFidelidade:
     resumo_texto: str = ""
     componentes_so_extracao: list[str] = field(default_factory=list)
     componentes_so_referencia: list[str] = field(default_factory=list)
+    avisos: list[str] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -71,15 +73,111 @@ class RelatorioFidelidade:
 def parsear_mcclear_site(caminho) -> pd.DataFrame:
     """Lê um CSV do CAMS McClear baixado do site da SoDa e padroniza.
 
-    Usa ``pvlib.iotools.read_cams`` (integrated=True -> Wh/m², igual à extração)
-    e devolve um DataFrame com ``timestamp`` (UTC, sem fuso) + GHI/BHI/DHI/DNI.
+    Caminho feliz: usa ``pvlib.iotools.read_cams`` (integrated=True -> Wh/m²,
+    igual à extração). Mas se o arquivo tiver passado por um editor de planilha
+    com locale pt-BR — que troca o ponto decimal por separador de milhar e infla
+    os valores ~10.000× (ex.: ``1066.6589`` vira ``"10.666.589"``) — esse formato
+    é DETECTADO e decodificado automaticamente, para a conferência não acusar uma
+    diferença falsa. Devolve timestamp (UTC, sem fuso) + GHI/BHI/DHI/DNI.
     """
+    texto = _ler_texto(caminho)
+    if texto and _eh_corrompido(texto):
+        return _parsear_corrompido(texto)
+
     import pvlib
 
     dados, _meta = pvlib.iotools.read_cams(
         caminho, integrated=True, map_variables=True
     )
     return _padronizar_pvlib(dados)
+
+
+def _ler_texto(caminho) -> str:
+    """Lê o arquivo como texto; devolve '' se não for possível (ex.: file-like)."""
+    try:
+        with open(caminho, "r", encoding="utf-8", errors="ignore") as fh:
+            return fh.read()
+    except (OSError, TypeError, ValueError):
+        return ""
+
+
+# Valor numérico "corrompido": tem 2+ pontos (ex.: "10.666.589"), o que só
+# ocorre quando o ponto decimal virou separador de milhar.
+_RE_MULTIPONTO = re.compile(r"\d\.\d{3}\.\d")
+
+
+def _eh_corrompido(texto: str) -> bool:
+    """True se algum valor numérico aparece com separador de milhar (2+ pontos)."""
+    for linha in texto.splitlines():
+        if not linha or linha.startswith("#"):
+            continue
+        if "/" not in linha.split(";", 1)[0]:
+            continue
+        if _RE_MULTIPONTO.search(linha):
+            return True
+    return False
+
+
+def _decodificar(token: str) -> float:
+    """Decodifica um valor do arquivo corrompido: tira os pontos e divide por
+    10.000 (o McClear sempre traz 4 casas decimais)."""
+    token = token.strip()
+    if not token:
+        return float("nan")
+    try:
+        return int(token.replace(".", "")) / 10000.0
+    except ValueError:
+        return float("nan")
+
+
+def _parsear_corrompido(texto: str) -> pd.DataFrame:
+    """Parser do CSV McClear corrompido por editor de planilha (pt-BR)."""
+    mapa = {
+        "Clear sky GHI": "GHI", "Clear sky BHI": "BHI",
+        "Clear sky DHI": "DHI", "Clear sky BNI": "DNI",
+    }
+    nomes = None
+    linhas_dados = []
+    for linha in texto.splitlines():
+        linha = linha.rstrip()
+        if not linha:
+            continue
+        if "Clear sky GHI" in linha and ";" in linha:
+            nomes = [c.strip().lstrip("# ").strip() for c in linha.split(";")]
+            continue
+        if linha.startswith("#"):
+            continue
+        if "/" in linha.split(";", 1)[0]:
+            linhas_dados.append(linha.split(";"))
+
+    if nomes:
+        idx = {mapa[n]: i for i, n in enumerate(nomes) if n in mapa}
+    else:  # ordem padrão do McClear: período;TOA;GHI;BHI;DHI;BNI
+        idx = {"GHI": 2, "BHI": 3, "DHI": 4, "DNI": 5}
+
+    registros = []
+    for campos in linhas_dados:
+        ts = pd.Timestamp(campos[0].split("/")[0].replace(".0", ""))
+        reg = {"timestamp": ts}
+        for comp, i in idx.items():
+            reg[comp] = _decodificar(campos[i]) if i < len(campos) else float("nan")
+        registros.append(reg)
+    df = pd.DataFrame(registros)
+    cols = ["timestamp"] + [c for c in COMPONENTES if c in df.columns]
+    return df[cols]
+
+
+def ler_altitude_site(caminho) -> float | None:
+    """Extrai a altitude (m) do cabeçalho do CSV do site, se houver."""
+    m = re.search(
+        r"Altitude\s*\(m\)\s*:\s*([0-9]+(?:\.[0-9]+)?)", _ler_texto(caminho)
+    )
+    if not m:
+        return None
+    try:
+        return float(m.group(1))
+    except ValueError:
+        return None
 
 
 def _padronizar_pvlib(dados: pd.DataFrame) -> pd.DataFrame:
@@ -203,10 +301,37 @@ def conferir_mcclear(
     caminho_csv_site,
     tol_abs: float = TOL_ABS_WHM2,
     tol_rel: float = TOL_REL,
+    altitude_extracao: float | None = None,
 ) -> RelatorioFidelidade:
-    """Confere a ``extracao`` contra um CSV do CAMS McClear baixado da SoDa."""
+    """Confere a ``extracao`` contra um CSV do CAMS McClear baixado da SoDa.
+
+    Detecta arquivo corrompido por editor de planilha (decodifica sozinho) e, se
+    ``altitude_extracao`` for informada, avisa quando difere da altitude do site
+    (causa típica de diferença sistemática). Avisos vão em ``rel.avisos``.
+    """
+    texto = _ler_texto(caminho_csv_site)
     referencia = parsear_mcclear_site(caminho_csv_site)
-    return comparar(extracao, referencia, "CAMS McClear", tol_abs, tol_rel)
+    rel = comparar(extracao, referencia, "CAMS McClear", tol_abs, tol_rel)
+
+    avisos: list[str] = []
+    if texto and _eh_corrompido(texto):
+        avisos.append(
+            "O arquivo do site parecia alterado por editor de planilha (o ponto "
+            "decimal virou separador de milhar); os valores foram decodificados "
+            "automaticamente (÷10.000). Para evitar, use o CSV original da SoDa."
+        )
+    alt_site = ler_altitude_site(caminho_csv_site)
+    if (
+        altitude_extracao is not None and alt_site is not None
+        and altitude_extracao > 0 and abs(alt_site - altitude_extracao) > 1.0
+    ):
+        avisos.append(
+            f"Altitude diferente: o site usou {alt_site:.0f} m e a extração usou "
+            f"{altitude_extracao:.0f} m. Para bater 100%, re-extraia com "
+            f"{alt_site:.0f} m (a mesma altitude do site)."
+        )
+    rel.avisos = avisos
+    return rel
 
 
 # ---------------------------------------------------------------------------
@@ -283,6 +408,10 @@ def formatar_relatorio_md(rel: RelatorioFidelidade) -> str:
                 f"| {comp} | {m['n_avaliado']} | {m['max_abs']:.2f} | "
                 f"{m['max_rel'] * 100:.2f}% | {m['n_fora_tol']} |"
             )
+        md.append("")
+    for a in rel.avisos:
+        md.append(f"> ⚠️ {a}")
+    if rel.avisos:
         md.append("")
     md.append("> " + rel.resumo_texto.replace("\n", "  \n> "))
     return "\n".join(md)
