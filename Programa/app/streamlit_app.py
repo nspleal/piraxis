@@ -150,8 +150,8 @@ def _figura_series(df: pd.DataFrame) -> go.Figure:
             )
         )
     else:
-        cores = {"GHI": AZUL, "DNI": AMBAR, "DHI": "#6B8FB5", "BHI": "#C8822E"}
-        for comp in ("GHI", "DNI", "DHI", "BHI"):
+        cores = {"GHI": AZUL, "BHI": "#C8822E", "DHI": "#6B8FB5", "DNI": AMBAR}
+        for comp in ("GHI", "BHI", "DHI", "DNI"):
             if comp in df.columns:
                 fig.add_trace(
                     go.Scatter(
@@ -277,7 +277,12 @@ with st.sidebar:
         "Longitude", value=BOTUCATU.longitude, min_value=-180.0, max_value=180.0,
         format="%.4f",
     )
-    altitude = st.number_input("Altitude (m)", value=BOTUCATU.altitude, format="%.1f")
+    altitude = st.number_input(
+        "Altitude (m)", value=BOTUCATU.altitude, format="%.1f",
+        help="Informativo. O CAMS McClear estima a altitude pela própria fonte "
+             "(SRTM), igual ao site da SoDa, para a extração bater com o "
+             "download oficial.",
+    )
 
     st.subheader("📅 Período")
     data_inicio = st.date_input(
@@ -555,7 +560,7 @@ if "combinado" in st.session_state:
     st.divider()
     tem_serie = any(
         c in combinado.columns
-        for c in ("GHI", "DNI", "DHI", "BHI", "GHI_McClear", "GHI_NASA")
+        for c in ("GHI", "BHI", "DHI", "DNI", "GHI_McClear", "GHI_NASA")
     )
     if tem_serie:
         st.plotly_chart(_figura_series(combinado), use_container_width=True)

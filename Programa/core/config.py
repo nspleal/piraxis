@@ -98,7 +98,7 @@ COMPONENTES_RADIACAO: dict[str, dict[str, str]] = {
     "DNI": {
         "rotulo": "DNI — Irradiação Normal Direta",
         "unidade": "Wh/m²",
-        "descricao": "Radiação direta recebida numa superfície perpendicular ao Sol.",
+        "descricao": "Radiação direta recebida numa superfície perpendicular ao Sol (equivale ao 'BNI' no site da SoDa/CAMS).",
     },
     "DHI": {
         "rotulo": "DHI — Irradiação Difusa Horizontal",

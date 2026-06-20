@@ -137,7 +137,7 @@ def executar(email: str | None = None) -> tuple[str, str]:
             end=pd.Timestamp(fim, tz="UTC"),
             email=email,
             identifier="mcclear",
-            altitude=int(BOTUCATU.altitude),
+            altitude=None,
             time_step="1h",
             map_variables=True,
             timeout=60,
@@ -158,7 +158,7 @@ def executar(email: str | None = None) -> tuple[str, str]:
                 start=pd.Timestamp(inicio, tz="UTC"),
                 end=pd.Timestamp(fim, tz="UTC"),
                 email=email, identifier="cams_radiation",
-                altitude=int(BOTUCATU.altitude), time_step="1h",
+                altitude=None, time_step="1h",
                 map_variables=True, timeout=60,
             )
             tem_real = "ghi" in dfr.columns

@@ -37,8 +37,8 @@ Projeto acadêmico da UNESP; local padrão **Botucatu/SP** (−22.8867, −48.44
 - **Renomeação BNI→BHI** concluída: o 4º componente é **Feixe Horizontal** (`bhi_clear`).
 - **Cache versionado:** a chave de cache inclui `CACHE_SCHEMA` (`sources/base.py`). Ao mudar o
   formato dos dados (unidade, fuso, nomes de coluna), **incremente a versão** — caches antigos passam
-  a ser ignorados sozinhos (**não precisa apagar `Programa/cache/` na mão**). Versão atual: **2**
-  (NASA em UTC + renomeação BHI).
+  a ser ignorados sozinhos (**não precisa apagar `Programa/cache/` na mão**). Versão atual: **3**
+  (NASA em UTC; CAMS com altitude SRTM; ordem de colunas GHI/BHI/DHI/DNI).
 - **✅ Incoerência dos dados — CAUSA CONFIRMADA E CORRIGIDA (fuso horário):** a **NASA POWER** entrega
   **LST (hora solar local)** por padrão, enquanto o **McClear é UTC** e todo o projeto (grade, QC,
   validação) pressupõe UTC → as fontes ficavam **~3 h fora de fase** em Botucatu (kt sem sentido,
@@ -46,6 +46,12 @@ Projeto acadêmico da UNESP; local padrão **Botucatu/SP** (−22.8867, −48.44
   o cache versionado impede que respostas antigas (LST) mascarem a correção; o app deixa explícito
   que os horários são **UTC**. Teste de regressão em `tests/test_nasa.py`. ⚠️ **Validar com rede real**
   na máquina do pesquisador.
+- **✅ Incoerência do CAMS McClear — CORRIGIDA (altitude + ordem de colunas):** (a) **valores
+  levemente off** porque a altitude era fixada em 786 m, mas o site da SoDa usa **SRTM** → o cliente
+  agora envia `altitude=None` (SRTM), batendo exato com o download oficial; (b) **"colunas trocadas"**
+  = a ordem diferia da SoDa → `COMPONENTES_PADRAO` reordenado para **GHI, BHI, DHI, DNI** (o **DNI** do
+  projeto é o **BNI** da SoDa — mesmo dado, nome diferente). Teste de regressão em `tests/test_cams.py`.
+  ⚠️ **Validar com rede real** na máquina do pesquisador.
 - **Pendente (prioridade científica; proposto, não feito):** **modo auditoria** (salvar a resposta
   crua da fonte junto do Excel) + **ferramenta de conferência** (extração × download do site, linha a
   linha) + **relatório de fidelidade**.

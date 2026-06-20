@@ -514,8 +514,8 @@ def _escrever_resumo(
     )
     cel = ws.cell(row=linha_legenda, column=6)
     cel.value = (
-        "GHI: Global Horizontal · DNI: Direta Normal · DHI: Difusa Horizontal · "
-        f"BHI: Feixe Horizontal — irradiâncias em {unidade}"
+        "GHI: Global Horizontal · BHI: Feixe Horizontal · DHI: Difusa Horizontal · "
+        f"DNI: Direta Normal (BNI na SoDa) — irradiâncias em {unidade}"
     )
     cel.font = _fonte_legenda
 

@@ -17,7 +17,8 @@ Características do serviço (decisões já tomadas no projeto):
   - Autenticação pelo e-mail cadastrado E CONFIRMADO em soda-pro.com (não há
     chave de API). O e-mail é recebido no construtor, nunca de constante global.
   - Cobertura mundial -> cobre_local sempre True.
-  - Componentes retornados: GHI, DNI, DHI, BHI.
+  - Componentes retornados: GHI, BHI, DHI, DNI (ordem do arquivo da SoDa; o
+    "DNI" do projeto é o "BNI"/feixe normal da SoDa).
   - Atraso dos dados: a última data disponível é sempre hoje - 2 dias.
   - Limite de 100 requisições por dia por conta (por isso o cache-first).
 
@@ -212,12 +213,11 @@ class CamsMcClear(FonteRadiacao):
                 end=pd.Timestamp(data_fim),
                 email=self.email,
                 identifier=self.identifier,
-                # Altitude None faz o SoDa estimá-la (via base de dados SRTM).
-                altitude=(
-                    local.altitude
-                    if local.altitude and local.altitude > 0
-                    else None
-                ),
+                # Altitude SEMPRE estimada pela fonte (SoDa via SRTM), enviando
+                # None — é o que o site da SoDa faz por padrão, então a extração
+                # bate EXATAMENTE com o download oficial. Fixar a altitude do
+                # projeto (ex.: 786 m) deslocava levemente os valores de céu limpo.
+                altitude=None,
                 time_step=time_step,
                 # UTC. A NASA POWER é alinhada ao mesmo fuso via
                 # time-standard=UTC (ver sources/nasa_power.py); todo o projeto
