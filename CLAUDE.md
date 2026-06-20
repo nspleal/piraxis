@@ -67,8 +67,11 @@ Projeto acadêmico da UNESP; local padrão **Botucatu/SP** (−22.8867, −48.44
   Mantenha docs/estado **atualizados proativamente** (este arquivo inclusive).
 - **Sem teste cobrindo a mudança:** adicione um; se não for viável, **avise** em vez de empurrar no
   escuro. **Se um teste falhar:** não pushe — corrija ou reporte.
-- **Sempre confirmar antes:** abrir/mergear **Pull Request para `main`** (nunca criar PR sozinho) e
-  ações **irreversíveis** (apagar/sobrescrever o que não criou, reescrever histórico, `force-push`).
+- **Auto-merge autorizado (2026-06-20):** com a verificação **verde**, posso **abrir o PR e mergear na
+  branch padrão** do repositório **sem pedir confirmação** (o pesquisador revisa pelo histórico/PR
+  depois). A branch padrão hoje é `claude/confident-turing-1NV8t` (não existe `main`).
+- **Ainda confirmar antes:** ações **irreversíveis** (apagar/sobrescrever o que não criei, reescrever
+  histórico, `force-push`) e mudanças que contrariem decisões travadas/escopo.
 - **Cofre (`obsidian`):** **somente leitura** — nunca editar/commitar/pushar (ver bloco abaixo).
 
 ------------------------------------------------------------------
