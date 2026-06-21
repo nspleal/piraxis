@@ -35,6 +35,12 @@ Projeto acadêmico da UNESP; local padrão **Botucatu/SP** (−22.8867, −48.44
   `~/.radiacao_solar/config.json` > `SODA_EMAIL` > `--email`; itens de API ficam PULADOS sem e-mail).
 
 ## 4. Estado e KNOWN ISSUES (desta sessão; podem não estar no código)
+- **🎯 PRINCÍPIO DE FIDELIDADE (travado 2026-06-21):** toda extração deve sair **idêntica à sua
+  fonte** — CAMS McClear no formato do CAMS; NASA POWER no formato da NASA. Hoje o Excel está fiel ao
+  **CAMS** (período em faixa início–fim UTC, altitude do ponto, 4 casas decimais). ⚠️ **Ao trabalhar a
+  NASA:** revisar o formato para casar com a NASA POWER — provavelmente **timestamp instantâneo único**
+  (a NASA rotula a hora, não um intervalo início–fim), além de conferir unidades/colunas/decimais. Em
+  extração **combinada** (as duas fontes) será preciso decidir qual formato usar (a definir).
 - **Renomeação BNI→BHI** concluída: o 4º componente é **Feixe Horizontal** (`bhi_clear`).
 - **Cache versionado:** a chave de cache inclui `CACHE_SCHEMA` (`sources/base.py`). Ao mudar o
   formato dos dados (unidade, fuso, nomes de coluna), **incremente a versão** — caches antigos passam
