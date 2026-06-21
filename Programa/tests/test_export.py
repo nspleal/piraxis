@@ -211,6 +211,18 @@ def test_abas_qualidade_e_reprodutibilidade(tmp_path):
     assert "pesquisador@unesp.br" not in r_txt  # e-mail nunca na reprodutibilidade
 
 
+def test_dados_exibidos_com_4_casas_sem_arredondar(tmp_path):
+    """Os valores de radiação devem ser exibidos com 4 casas (precisão da fonte),
+    não arredondados para 1 casa; o valor guardado é o float completo."""
+    caminho = tmp_path / "saida_fmt.xlsx"
+    exporta(_df_uma_fonte(), _metadados(), caminho)
+    wb = load_workbook(caminho)
+    ws = wb["Dados"]
+    assert ws["B2"].number_format == "0.0000"   # célula de dado (GHI)
+    # A estatística (Média do GHI no Resumo) também usa 4 casas.
+    assert wb["Resumo"]["G4"].number_format == "0.0000"
+
+
 def test_passo_diario_usa_unidade_wh(tmp_path):
     ts = pd.date_range("2026-01-01", periods=10, freq="D")
     df = pd.DataFrame({"timestamp": ts, "GHI": np.full(10, 6500.0)})
