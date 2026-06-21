@@ -22,7 +22,7 @@ Projeto acadêmico da UNESP; local padrão **Botucatu/SP** (−22.8867, −48.44
 - `sources/base.py` — `FonteRadiacao` (ABC) + cache + reindex da grade temporal.
 - `sources/cams_mcclear.py` — cliente McClear via `pvlib.iotools.get_cams` (cache-first, contador de API).
 - `sources/nasa_power.py` — cliente NASA POWER (REST, −999→NaN, normaliza unidade).
-- `output/exporta_excel.py` — Excel no modelo oficial (abas Resumo, Dados, Qualidade, Reprodutibilidade).
+- `output/exporta_excel.py` — Excel no modelo do pesquisador (abas Resumo, Gráficos, Dados, Qualidade, Reprodutibilidade).
 - `app/streamlit_app.py` — interface (cards, gráficos Plotly, painel de QC, downloads).
 - `tests/` — `pytest` (mockado, sem rede) + scripts `validar_*.py` (suíte de validação).
 - `INICIAR EXTRATOR DE RADIAÇÃO.bat` / `Programa/INICIAR (Mac e Linux).command` — launchers.
@@ -75,8 +75,14 @@ Projeto acadêmico da UNESP; local padrão **Botucatu/SP** (−22.8867, −48.44
   period" do site. ⚠️ Não havia defasagem de horário — o app sempre bateu com o site (verificado: Δ=0
   em 240 h); era só convenção de rótulo (instante × intervalo). Valores saem com **4 casas decimais**
   (`FORMATO_DADOS`), sem arredondar (o valor na célula sempre foi exato; mudou a exibição). Como a
-  coluna de período virou texto, a **tabela de Energia Diária por data foi removida** (a energia total
-  por componente continua no Resumo). Regressões em `tests/test_export.py`.
+  coluna de período virou texto, a tabela de Energia Diária por data saiu da aba Dados — mas
+  **voltou na aba Gráficos** (via SUMPRODUCT, ver abaixo). Regressões em `tests/test_export.py`.
+- **✅ Excel redesenhado (modelo do pesquisador, 2026-06-21):** Resumo com a tabela de estatísticas em
+  **A14:G** (abaixo das Informações Gerais) e o gráfico comparativo no **topo direito (F1)**; nova aba
+  **"Gráficos"** (após Resumo) com energia diária por dia (**SUMPRODUCT** sobre o texto do período,
+  `LEFT(...,10)`), energia média diária por componente (referencia o Resumo) e **3 gráficos** (perfil
+  temporal com cores fixas por componente; energia diária; energia média). Tudo **genérico** sobre os
+  componentes presentes (CAMS/NASA/combinado). Regressões em `tests/test_export.py`.
 - **Ambiente de nuvem:** sem rede para a API SoDa e sem e-mail → validações de API ficam PULADAS aqui;
   confirme na máquina local do pesquisador.
 

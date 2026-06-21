@@ -228,6 +228,13 @@ def exporta(
         tem_dados=len(df) > 0,
     )
 
+    # Aba "Gráficos" (logo após o Resumo): perfil temporal + energia diária.
+    aba_graficos = wb.create_sheet("Gráficos", index=1)
+    _escrever_graficos(
+        aba_graficos, aba_dados, df, colunas_numericas, componentes,
+        unidade, passo, n_dias, rotulos,
+    )
+
     # Abas novas (QC e reprodutibilidade), sem tocar nas existentes.
     if relatorio_qc is not None:
         _escrever_qualidade(wb.create_sheet("Qualidade"), relatorio_qc)
@@ -351,10 +358,10 @@ def _escrever_resumo(
     tem_dados: bool,
 ) -> None:
     """Escreve título, metadados, estatísticas (fórmulas TabDados) e gráfico."""
-    # Larguras e alturas do modelo.
+    # Larguras e alturas do modelo (estatísticas agora em A:G).
     for letra, largura in {
-        "A": 24.7, "B": 28.6, "C": 17.1, "F": 21.0, "G": 18.1, "K": 21.0,
-        "L": 18.1,
+        "A": 26.7, "B": 18.1, "C": 19.0, "D": 14.0, "E": 20.0, "F": 21.0,
+        "G": 18.1,
     }.items():
         ws.column_dimensions[letra].width = largura
     ws.row_dimensions[1].height = 32.1
@@ -407,9 +414,9 @@ def _escrever_resumo(
     cel.number_format = "@"
     cel.alignment = Alignment(horizontal="left")
 
-    # --- Estatísticas de Radiação (F1:L1 título; F3:L3 cabeçalho) ------------
-    ws.merge_cells("F1:L1")
-    cel = ws["F1"]
+    # --- Estatísticas de Radiação: título A14:G14, cabeçalho A16:G16 ---------
+    ws.merge_cells("A14:G14")
+    cel = ws["A14"]
     cel.value = f"Estatísticas de Radiação ({unidade})"
     cel.font = _fonte_secao
     cel.alignment = _vcentro
@@ -418,14 +425,14 @@ def _escrever_resumo(
         "Componente", "Média", "Média Diurna", "Máximo", "Mínimo Diurno",
         "Energia (Wh/m²)", "kWh/m²/dia",
     ]
-    for j, nome in enumerate(cab_stats, start=6):
-        cel = ws.cell(row=3, column=j, value=nome)
+    for j, nome in enumerate(cab_stats, start=1):
+        cel = ws.cell(row=16, column=j, value=nome)
         cel.font = _fonte_cab
         cel.fill = _fill_azul
         cel.alignment = _centro_total
         cel.border = _borda_fina
 
-    linha = 4
+    linha = 17
     for k, comp in enumerate(componentes):
         rot = rotulos[comp]
         zebra = k % 2 == 1  # 2ª, 4ª... linhas listradas, como no modelo
@@ -436,13 +443,12 @@ def _escrever_resumo(
             valores[3] = f"=MAX(TabDados[{rot}])"
             valores[4] = f'=_xlfn.MINIFS(TabDados[{rot}],TabDados[{rot}],">0")'
             valores[5] = f"=SUM(TabDados[{rot}])"
-            # Energia média por dia = total / nº de dias do período (calculado em
-            # Python). Não usa COUNT na coluna de período porque ela agora é texto
-            # (faixa início–fim, igual ao site).
-            valores[6] = f"=K{linha}/{n_dias}/1000"
+            # Energia média/dia = total (col F) / nº de dias (a coluna de período
+            # é texto, então não dá para contar linhas com COUNT).
+            valores[6] = f"=F{linha}/{n_dias}/1000"
         formatos = [None, FORMATO_DADOS, FORMATO_DADOS, FORMATO_DADOS,
                     FORMATO_DADOS, FORMATO_ENERGIA, FORMATO_KWH]
-        for j, (valor, fmt) in enumerate(zip(valores, formatos), start=6):
+        for j, (valor, fmt) in enumerate(zip(valores, formatos), start=1):
             cel = ws.cell(row=linha, column=j, value=valor)
             cel.font = _fonte_normal
             cel.border = _borda_fina
@@ -453,20 +459,20 @@ def _escrever_resumo(
         linha += 1
     linha_fim_stats = linha - 1
 
-    # --- Legenda (mesclada, 2 linhas abaixo da tabela; F9 no modelo) ---------
-    linha_legenda = max(9, linha_fim_stats + 2)
+    # --- Legenda (mesclada A:G, 1 linha abaixo da tabela) -------------------
+    linha_legenda = linha_fim_stats + 2
     ws.merge_cells(
-        start_row=linha_legenda, start_column=6,
-        end_row=linha_legenda, end_column=12,
+        start_row=linha_legenda, start_column=1,
+        end_row=linha_legenda, end_column=7,
     )
-    cel = ws.cell(row=linha_legenda, column=6)
+    cel = ws.cell(row=linha_legenda, column=1)
     cel.value = (
-        "GHI: Global Horizontal · BHI: Feixe Horizontal · DHI: Difusa Horizontal · "
-        f"DNI: Direta Normal (BNI na SoDa) — irradiâncias em {unidade}"
+        "TOA: Topo da Atmosfera · GHI: Global Horizontal · BHI: Feixe Horizontal · "
+        f"DHI: Difusa Horizontal · DNI: Direta Normal (BNI na SoDa) — em {unidade}"
     )
     cel.font = _fonte_legenda
 
-    # --- Gráfico comparativo (Média / Média Diurna / Máximo por componente) --
+    # --- Gráfico comparativo (Média / Média Diurna / Máximo) no topo direito -
     if tem_dados and componentes:
         grafico = BarChart()
         grafico.type = "col"
@@ -479,16 +485,187 @@ def _escrever_resumo(
         grafico.width = 15
         grafico.y_axis.title = unidade
         grafico.y_axis.number_format = FORMATO_VALOR
-        dados = Reference(
-            ws, min_col=7, max_col=9, min_row=3, max_row=linha_fim_stats
-        )
-        cats = Reference(ws, min_col=6, min_row=4, max_row=linha_fim_stats)
+        dados = Reference(ws, min_col=2, max_col=4, min_row=16,
+                          max_row=linha_fim_stats)
+        cats = Reference(ws, min_col=1, min_row=17, max_row=linha_fim_stats)
         grafico.add_data(dados, titles_from_data=True)
         grafico.set_categories(cats)
-        # Âncora A14 no modelo; desce se a tabela de estatísticas for maior.
-        linha_grafico = max(14, linha_legenda + 2)
-        ws.row_dimensions[linha_grafico - 1].height = 9.95
-        ws.add_chart(grafico, f"A{linha_grafico}")
+        ws.add_chart(grafico, "F1")
+
+
+# ---------------------------------------------------------------------------
+# Aba "Gráficos"
+# ---------------------------------------------------------------------------
+# Cores do perfil temporal por componente (como no modelo do pesquisador).
+_CORES_PERFIL = {
+    "TOA": "7F7F7F", "GHI": "ED7D31", "BHI": "2E9F4F",
+    "DHI": "7030A0", "DNI": "C00000",
+}
+_PALETA_EXTRA = ["1F5C8B", "E8A33D", "6B8FB5", "C8822E", "8E44AD", "16A085"]
+
+
+def _base_comp(comp: str) -> str:
+    return (
+        comp.replace("_McClear", "").replace("_NASA", "").replace("_ceu_limpo", "")
+    )
+
+
+def _cor_perfil(comp: str, i: int) -> str:
+    return _CORES_PERFIL.get(_base_comp(comp), _PALETA_EXTRA[i % len(_PALETA_EXTRA)])
+
+
+def _escrever_graficos(
+    ws: Worksheet,
+    aba_dados: Worksheet,
+    df: pd.DataFrame,
+    colunas_numericas: list[str],
+    componentes: list[str],
+    unidade: str,
+    passo: str,
+    n_dias: int,
+    rotulos: dict[str, str],
+) -> None:
+    """Aba 'Gráficos': perfil temporal de irradiância + tabela de energia diária
+    por dia (via SUMPRODUCT sobre o texto do período) + energia média diária por
+    componente, com três gráficos. Genérica para os componentes presentes.
+    """
+    n_linhas = len(df)
+    ws.column_dimensions["A"].width = 15.3
+    for letra in ("B", "C", "D", "E"):
+        ws.column_dimensions[letra].width = 14.3
+
+    # --- Título (A1:F1) -----------------------------------------------------
+    ws.merge_cells("A1:F1")
+    cel = ws["A1"]
+    cel.value = "Gráficos de Radiação Solar"
+    cel.font = _fonte_titulo
+    cel.alignment = _centro
+    for c in ws["A1:F1"][0]:
+        c.fill = _fill_azul
+    ws.row_dimensions[1].height = 32.1
+
+    if n_linhas == 0 or not componentes:
+        return
+
+    # Componentes "de solo" para a energia diária (exclui TOA).
+    comp_solo = [c for c in componentes if _base_comp(c) != "TOA"]
+    gerar_diaria = (
+        passo != "1M" and bool(comp_solo) and n_dias <= MAX_DIAS_ENERGIA
+    )
+
+    # ===== Tabela "Energia diária por dia (kWh/m²)" (a partir de A3) =========
+    if gerar_diaria:
+        ws.cell(row=3, column=1,
+                value="Energia diária por dia (kWh/m²)").font = _fonte_secao
+        cel = ws.cell(row=4, column=1, value="Data")
+        cel.font = _fonte_cab
+        cel.fill = _fill_azul
+        cel.alignment = _centro
+        for k, comp in enumerate(comp_solo, start=1):
+            cel = ws.cell(row=4, column=1 + k, value=comp)
+            cel.font = _fonte_cab
+            cel.fill = _fill_azul
+            cel.alignment = _centro
+        primeiro = df["timestamp"].dropna().min()
+        for d in range(n_dias):
+            r = 5 + d
+            cel = ws.cell(row=r, column=1)
+            cel.value = (
+                f"=DATE({primeiro.year},{primeiro.month},{primeiro.day})"
+                if d == 0 else f"=A{r - 1}+1"
+            )
+            cel.number_format = "dd/mm"
+            cel.font = _fonte_normal
+            for k, comp in enumerate(comp_solo, start=1):
+                rot = rotulos[comp]
+                cel = ws.cell(row=r, column=1 + k)
+                # Soma por dia: extrai a data (10 primeiros caracteres) do texto
+                # do período e compara com a data da linha. /1000 -> kWh/m².
+                cel.value = (
+                    '=SUMPRODUCT(--(LEFT(TabDados[Período (UTC)],10)'
+                    f'=TEXT($A{r},"dd/mm/aaaa")),TabDados[{rot}])/1000'
+                )
+                cel.number_format = "0.00"
+                cel.font = _fonte_normal
+        fim_diaria = 4 + n_dias
+        tit2 = fim_diaria + 3
+    else:
+        tit2 = 3
+
+    # ===== Tabela "Energia média diária por componente" =====================
+    cab2 = tit2 + 1
+    ini2 = tit2 + 2
+    ws.cell(row=tit2, column=1,
+            value="Energia média diária por componente (kWh/m²/dia)").font = _fonte_secao
+    for j, nome in enumerate(("Componente", "kWh/m²/dia"), start=1):
+        cel = ws.cell(row=cab2, column=j, value=nome)
+        cel.font = _fonte_cab
+        cel.fill = _fill_azul
+        cel.alignment = _centro
+    for k in range(len(componentes)):
+        r = ini2 + k
+        ws.cell(row=r, column=1, value=f"=Resumo!A{17 + k}").font = _fonte_normal
+        cel = ws.cell(row=r, column=2, value=f"=Resumo!G{17 + k}")
+        cel.number_format = "0.00"
+        cel.font = _fonte_normal
+    fim_media = ini2 + len(componentes) - 1
+
+    # ===== Gráfico 1: perfil temporal (linha) — dados na aba "Dados" =========
+    titulo_perfil = {
+        "1min": "Perfil de irradiância", "15min": "Perfil de irradiância",
+        "1h": "Perfil horário de irradiância", "1d": "Perfil diário de irradiância",
+        "1M": "Perfil mensal de irradiância",
+    }.get(passo, "Perfil de irradiância")
+    perfil = LineChart()
+    perfil.title = f"{titulo_perfil} ({unidade})"
+    perfil.legend.position = "b"
+    perfil.height = 9.0
+    perfil.width = 20.0
+    perfil.y_axis.number_format = "#,##0"
+    cats = Reference(aba_dados, min_col=1, min_row=2, max_row=n_linhas + 1)
+    for comp in componentes:
+        idx = 2 + colunas_numericas.index(comp)
+        ref = Reference(aba_dados, min_col=idx, min_row=1, max_row=n_linhas + 1)
+        perfil.add_data(ref, titles_from_data=True)
+    perfil.set_categories(cats)
+    for i, (serie, comp) in enumerate(zip(perfil.series, componentes)):
+        serie.smooth = False
+        serie.graphicalProperties = GraphicalProperties(
+            ln=LineProperties(solidFill=_cor_perfil(comp, i),
+                              w=LARGURA_LINHA_GRAFICO)
+        )
+    ws.add_chart(perfil, "G3")
+
+    # ===== Gráfico 2: energia diária por componente (barras) ================
+    if gerar_diaria:
+        bar1 = BarChart()
+        bar1.type = "col"
+        bar1.grouping = "clustered"
+        bar1.title = "Energia diária por componente (kWh/m²)"
+        bar1.legend.position = "b"
+        bar1.height = 9.0
+        bar1.width = 20.0
+        bar1.y_axis.number_format = "0.00"
+        dados = Reference(ws, min_col=2, max_col=1 + len(comp_solo),
+                          min_row=4, max_row=fim_diaria)
+        cats = Reference(ws, min_col=1, min_row=5, max_row=fim_diaria)
+        bar1.add_data(dados, titles_from_data=True)
+        bar1.set_categories(cats)
+        ws.add_chart(bar1, "G24")
+
+    # ===== Gráfico 3: energia média diária por componente (barras) ==========
+    bar2 = BarChart()
+    bar2.type = "col"
+    bar2.title = "Energia média diária por componente (kWh/m²/dia)"
+    bar2.legend.position = "b"
+    bar2.height = 8.0
+    bar2.width = 15.0
+    bar2.y_axis.number_format = "0.00"
+    dados = Reference(ws, min_col=2, min_row=cab2, max_row=fim_media)
+    cats = Reference(ws, min_col=1, min_row=ini2, max_row=fim_media)
+    bar2.add_data(dados, titles_from_data=True)
+    bar2.set_categories(cats)
+    ws.add_chart(bar2, f"A{fim_media + 3}")
 
 
 # ---------------------------------------------------------------------------
