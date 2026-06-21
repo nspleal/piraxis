@@ -90,6 +90,11 @@ class Config:
 # Cada componente tem rótulo amigável, unidade e descrição em português.
 # Unidade padrão: Wh/m² (consistência entre McClear e NASA POWER).
 COMPONENTES_RADIACAO: dict[str, dict[str, str]] = {
+    "TOA": {
+        "rotulo": "TOA — Irradiação no Topo da Atmosfera",
+        "unidade": "Wh/m²",
+        "descricao": "Radiação no topo da atmosfera (extraterrestre), antes da atmosfera e das nuvens — o teto teórico do ponto.",
+    },
     "GHI": {
         "rotulo": "GHI — Irradiação Global Horizontal",
         "unidade": "Wh/m²",

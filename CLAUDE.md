@@ -12,7 +12,7 @@ Projeto acadêmico da UNESP; local padrão **Botucatu/SP** (−22.8867, −48.44
 
 ## 2. Mapa de pastas/módulos (tudo dentro de `Programa/`)
 - `Programa/` — o projeto; a raiz só tem o launcher + esta pasta.
-- `core/config.py` — `Local`, `BOTUCATU`, componentes (GHI/DNI/DHI/**BHI**), passos, caminhos.
+- `core/config.py` — `Local`, `BOTUCATU`, componentes (TOA/GHI/DNI/DHI/**BHI**), passos, caminhos.
 - `core/credenciais.py` — e-mail SoDa por máquina (`~/.radiacao_solar/config.json`).
 - `core/combinador.py` — une as fontes por timestamp; calcula `kt` (índice de claridade).
 - `core/qualidade.py` — QC físico (lacunas, negativos, noturno, envelope, fechamento, concordância).
@@ -41,6 +41,9 @@ Projeto acadêmico da UNESP; local padrão **Botucatu/SP** (−22.8867, −48.44
   NASA:** revisar o formato para casar com a NASA POWER — provavelmente **timestamp instantâneo único**
   (a NASA rotula a hora, não um intervalo início–fim), além de conferir unidades/colunas/decimais. Em
   extração **combinada** (as duas fontes) será preciso decidir qual formato usar (a definir).
+- **✅ TOA incluído (fidelidade CAMS):** a extração do CAMS traz a coluna **TOA** (irradiação no topo
+  da atmosfera = extraterrestre; `ghi_extra` da pvlib), como o arquivo do site. Ordem: **TOA, GHI, BHI,
+  DHI, DNI**. Cache `CACHE_SCHEMA` = **5**.
 - **Renomeação BNI→BHI** concluída: o 4º componente é **Feixe Horizontal** (`bhi_clear`).
 - **Cache versionado:** a chave de cache inclui `CACHE_SCHEMA` (`sources/base.py`). Ao mudar o
   formato dos dados (unidade, fuso, nomes de coluna), **incremente a versão** — caches antigos passam

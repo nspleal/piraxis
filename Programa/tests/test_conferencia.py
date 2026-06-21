@@ -116,7 +116,7 @@ def _fake_read_cams(periodos: int = 4):
             "bhi_clear": base * 0.7,
             "dhi_clear": base * 0.2,
             "dni_clear": base * 0.9,
-            "ghi_extra": base * 2,  # ignorada
+            "ghi_extra": base * 2,  # -> TOA (topo da atmosfera)
         },
         index=idx,
     )
@@ -131,7 +131,7 @@ def test_parsear_site_mockado(monkeypatch):
     )
     df = parsear_mcclear_site("arquivo_do_site.csv")
     # Colunas padronizadas, na ordem da SoDa, e timestamp sem fuso.
-    assert list(df.columns) == ["timestamp", "GHI", "BHI", "DHI", "DNI"]
+    assert list(df.columns) == ["timestamp", "TOA", "GHI", "BHI", "DHI", "DNI"]
     assert df["timestamp"].dt.tz is None
     assert df["GHI"].iloc[0] == 500.0
 
@@ -165,7 +165,8 @@ def test_parsear_site_corrompido_pelo_excel(tmp_path):
     p = tmp_path / "site_excel.csv"
     p.write_text(CSV_CORROMPIDO, encoding="utf-8")
     df = parsear_mcclear_site(str(p))
-    assert list(df.columns) == ["timestamp", "GHI", "BHI", "DHI", "DNI"]
+    assert list(df.columns) == ["timestamp", "TOA", "GHI", "BHI", "DHI", "DNI"]
+    assert abs(df["TOA"].iloc[0] - 1333.4834) < 1e-6   # "13.334.834" -> 1333.4834
     assert abs(df["GHI"].iloc[0] - 1066.6589) < 1e-6
     assert abs(df["DNI"].iloc[0] - 998.6248) < 1e-6   # BNI da SoDa -> DNI
     assert df["timestamp"].iloc[0] == pd.Timestamp("2026-03-01 15:00")
