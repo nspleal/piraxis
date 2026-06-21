@@ -31,10 +31,10 @@ from core.config import CACHE_DIR
 logger = logging.getLogger(__name__)
 
 # Nomes padronizados das colunas de componentes, NA ORDEM do arquivo do site da
-# SoDa/CAMS McClear (GHI, BHI, DHI, BNI), para facilitar a conferência coluna a
-# coluna com o download oficial. Obs.: o "DNI" do projeto é o "BNI" da SoDa
-# (irradiância de feixe normal) — mesmo dado, nome diferente.
-COMPONENTES_PADRAO: tuple[str, ...] = ("GHI", "BHI", "DHI", "DNI")
+# SoDa/CAMS McClear (TOA, GHI, BHI, DHI, BNI), para facilitar a conferência coluna
+# a coluna com o download oficial. Obs.: o "DNI" do projeto é o "BNI" da SoDa
+# (feixe normal) e "TOA" é a irradiação no topo da atmosfera (extraterrestre).
+COMPONENTES_PADRAO: tuple[str, ...] = ("TOA", "GHI", "BHI", "DHI", "DNI")
 
 # Versão do ESQUEMA do cache. Faz parte da chave de cache: ao incrementar, todos
 # os arquivos de cache antigos passam a ser ignorados (nunca lidos), evitando que
@@ -46,7 +46,8 @@ COMPONENTES_PADRAO: tuple[str, ...] = ("GHI", "BHI", "DHI", "DNI")
 #   v3: ordem de colunas passou a espelhar a SoDa (GHI, BHI, DHI, DNI).
 #   v4: CAMS McClear usa a altitude CONFIGURADA do ponto (ex.: 786 m), igual ao
 #       site, para fidelidade exata (a v3 usava SRTM e ficava ~0,2% off).
-CACHE_SCHEMA = "4"
+#   v5: inclui a coluna TOA (topo da atmosfera) do CAMS, como no arquivo do site.
+CACHE_SCHEMA = "5"
 
 # Frequência pandas correspondente a cada passo temporal ISO do projeto.
 # Usada para montar a grade completa de horários do período solicitado.

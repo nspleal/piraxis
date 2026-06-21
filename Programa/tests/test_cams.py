@@ -33,7 +33,7 @@ def _resposta_pvlib() -> tuple[pd.DataFrame, dict]:
             "dni_clear": [610.0, 700.0],
             "dhi_clear": [120.0, 150.0],
             "bhi_clear": [480.0, 560.0],
-            "ghi_extra": [1000.0, 1010.0],  # coluna extra ignorada
+            "ghi_extra": [1000.0, 1010.0],  # mapeada para TOA (topo da atmosfera)
         },
         index=idx,
     )
@@ -62,7 +62,7 @@ def test_parsing_e_normalizacao_colunas(mock_get_cams):
     df = fonte.buscar(BOTUCATU, date(2024, 1, 1), date(2024, 1, 1), "PT01H")
 
     assert list(df.columns)[0] == "timestamp"
-    for col in ("GHI", "DNI", "DHI", "BHI"):
+    for col in ("TOA", "GHI", "DNI", "DHI", "BHI"):
         assert col in df.columns
 
     # Pedido de 1 dia em passo horário -> grade completa de 24 linhas.
@@ -72,6 +72,7 @@ def test_parsing_e_normalizacao_colunas(mock_get_cams):
     por_hora = df.set_index("timestamp")
     assert por_hora.loc["2024-01-01 10:00", "GHI"] == 520.0
     assert por_hora.loc["2024-01-01 11:00", "BHI"] == 560.0  # bhi_clear -> BHI
+    assert por_hora.loc["2024-01-01 10:00", "TOA"] == 1000.0  # ghi_extra -> TOA
 
 
 def test_altitude_do_ponto_e_ordem_das_colunas(mock_get_cams):
@@ -88,7 +89,7 @@ def test_altitude_do_ponto_e_ordem_das_colunas(mock_get_cams):
     assert mock_get_cams["kwargs"]["altitude"] == BOTUCATU.altitude
 
     # Ordem das colunas espelha o arquivo da SoDa (DNI = "BNI" da SoDa).
-    assert list(df.columns) == ["timestamp", "GHI", "BHI", "DHI", "DNI"]
+    assert list(df.columns) == ["timestamp", "TOA", "GHI", "BHI", "DHI", "DNI"]
 
 
 def test_resposta_crua_capturada_para_auditoria(mock_get_cams):

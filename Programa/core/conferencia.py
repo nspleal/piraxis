@@ -33,10 +33,11 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 # Componentes comparáveis, na ordem do arquivo da SoDa.
-COMPONENTES = ("GHI", "BHI", "DHI", "DNI")
+COMPONENTES = ("TOA", "GHI", "BHI", "DHI", "DNI")
 
 # Nomes da pvlib (céu limpo) -> nomes do projeto.
 _PVLIB_PARA_PROJETO: dict[str, str] = {
+    "ghi_extra": "TOA",
     "ghi_clear": "GHI",
     "bhi_clear": "BHI",
     "dhi_clear": "DHI",
@@ -133,6 +134,7 @@ def _decodificar(token: str) -> float:
 def _parsear_corrompido(texto: str) -> pd.DataFrame:
     """Parser do CSV McClear corrompido por editor de planilha (pt-BR)."""
     mapa = {
+        "TOA": "TOA",
         "Clear sky GHI": "GHI", "Clear sky BHI": "BHI",
         "Clear sky DHI": "DHI", "Clear sky BNI": "DNI",
     }

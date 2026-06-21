@@ -17,8 +17,8 @@ Características do serviço (decisões já tomadas no projeto):
   - Autenticação pelo e-mail cadastrado E CONFIRMADO em soda-pro.com (não há
     chave de API). O e-mail é recebido no construtor, nunca de constante global.
   - Cobertura mundial -> cobre_local sempre True.
-  - Componentes retornados: GHI, BHI, DHI, DNI (ordem do arquivo da SoDa; o
-    "DNI" do projeto é o "BNI"/feixe normal da SoDa).
+  - Componentes retornados: TOA, GHI, BHI, DHI, DNI (ordem do arquivo da SoDa; o
+    "DNI" do projeto é o "BNI"/feixe normal da SoDa; TOA = topo da atmosfera).
   - Atraso dos dados: a última data disponível é sempre hoje - 2 dias.
   - Limite de 100 requisições por dia por conta (por isso o cache-first).
 
@@ -73,6 +73,7 @@ ISO_PARA_PVLIB: dict[str, str] = {
 # colunas de radiação REAL do cams_radiation (ghi, dni, ...) não entram nos
 # componentes padrão (céu limpo) e ficam de fora.
 CANDIDATOS_COMPONENTE: dict[str, tuple[str, ...]] = {
+    "TOA": ("ghi_extra",),
     "GHI": ("ghi_clear",),
     "DNI": ("dni_clear",),
     "DHI": ("dhi_clear",),
