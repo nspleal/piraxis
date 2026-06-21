@@ -47,8 +47,8 @@ Projeto acadêmico da UNESP; local padrão **Botucatu/SP** (−22.8867, −48.44
 - **Renomeação BNI→BHI** concluída: o 4º componente é **Feixe Horizontal** (`bhi_clear`).
 - **Cache versionado:** a chave de cache inclui `CACHE_SCHEMA` (`sources/base.py`). Ao mudar o
   formato dos dados (unidade, fuso, nomes de coluna), **incremente a versão** — caches antigos passam
-  a ser ignorados sozinhos (**não precisa apagar `Programa/cache/` na mão**). Versão atual: **4**
-  (NASA em UTC; CAMS com a **altitude do ponto** — igual ao site; ordem de colunas GHI/BHI/DHI/DNI).
+  a ser ignorados sozinhos (**não precisa apagar `Programa/cache/` na mão**). Versão atual: **5**
+  (NASA em UTC; CAMS com a **altitude do ponto** — igual ao site; ordem TOA/GHI/BHI/DHI/DNI + coluna TOA).
 - **✅ Incoerência dos dados — CAUSA CONFIRMADA E CORRIGIDA (fuso horário):** a **NASA POWER** entrega
   **LST (hora solar local)** por padrão, enquanto o **McClear é UTC** e todo o projeto (grade, QC,
   validação) pressupõe UTC → as fontes ficavam **~3 h fora de fase** em Botucatu (kt sem sentido,
