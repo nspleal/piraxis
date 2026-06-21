@@ -31,6 +31,7 @@ Execute com:  streamlit run app/streamlit_app.py
 
 from __future__ import annotations
 
+import base64
 import logging
 import sys
 from datetime import date, timedelta
@@ -107,6 +108,16 @@ LOGO_SVG = (
     "<circle cx='28' cy='6' r='4.5' fill='#E0A050'/>"
     "<circle cx='28' cy='28' r='3' fill='#E0A050'/></svg>"
 )
+
+# Logo institucional da UNESP (variante escura), exibido no canto superior direito.
+LOGO_UNESP = ASSETS_DIR / "unesp-horizontal-dark.png"
+
+
+def _unesp_b64() -> str | None:
+    """Logo da UNESP (variante escura) como data URI, se o arquivo existir."""
+    if LOGO_UNESP.exists():
+        return base64.b64encode(LOGO_UNESP.read_bytes()).decode("ascii")
+    return None
 
 # Ordem em que os cards de métrica aparecem no Painel (componentes da superfície
 # primeiro; TOA por último — é o teto teórico).
@@ -600,6 +611,13 @@ def _cabecalho() -> None:
         kind, valor = "Dia", f"{data_inicio:%d/%m/%Y}"
     else:
         kind, valor = "Período", f"{data_inicio:%d/%m}–{data_fim:%d/%m/%Y}"
+    unesp = _unesp_b64()
+    unesp_html = (
+        "<div style='width:0.5px;height:30px;background:rgba(255,255,255,0.12);"
+        "margin:0 4px 0 12px'></div>"
+        f"<img src='data:image/png;base64,{unesp}' alt='UNESP' "
+        "style='height:24px;width:auto;display:block'/>"
+    ) if unesp else ""
     st.markdown(
         "<div class='rad-header'>"
         "<div class='rad-header-left'>"
@@ -613,6 +631,7 @@ def _cabecalho() -> None:
         f"{latitude:.4f}, {longitude:.4f} · {altitude:.0f} m</span></span>"
         f"<span class='rad-pill rad-pill-date'>{kind} "
         f"<span style='font-family:JetBrains Mono,monospace;font-weight:500;color:#A9C4DC'>{valor}</span></span>"
+        f"{unesp_html}"
         "</div></div>",
         unsafe_allow_html=True,
     )
