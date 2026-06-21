@@ -1,10 +1,10 @@
 [project]
-name = "radiacao-solar"
+name = "piraxis"
 version = "0.1.0"
-description = "Ferramenta local para extrair, combinar e exportar dados de radiação solar (UNESP)."
+description = "PIRAXIS — ferramenta local para extrair, combinar e exportar dados de radiação solar (UNESP)."
 readme = "README.md"
 requires-python = ">=3.11"
-authors = [{ name = "Projeto IC - UNESP" }]
+authors = [{ name = "Projeto PIRAXIS — UNESP" }]
 dependencies = [
     "streamlit>=1.30",
     "pandas>=2.0",

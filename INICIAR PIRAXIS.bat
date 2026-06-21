@@ -1,6 +1,6 @@
 @echo off
 REM ===========================================================================
-REM  EXTRATOR DE RADIACAO SOLAR (UNESP)
+REM  PIRAXIS - EXTRATOR DE RADIACAO SOLAR (UNESP)
 REM  De DOIS CLIQUES neste arquivo para abrir o programa.
 REM
 REM  Todo o funcionamento fica na pasta "Programa" (ao lado deste arquivo).
@@ -10,7 +10,7 @@ REM  Na PRIMEIRA vez ele instala tudo (demora alguns minutos, e' normal).
 REM  Depois abre sozinho no navegador. Para fechar, feche esta janela.
 REM ===========================================================================
 cd /d "%~dp0Programa"
-title Extrator de Radiacao Solar
+title PIRAXIS - Extrator de Radiacao Solar
 
 REM Confere se a pasta interna existe.
 if not exist "app\streamlit_app.py" (

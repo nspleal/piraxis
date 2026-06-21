@@ -7,7 +7,7 @@ Geração da planilha Excel (.xlsx) no formato do MODELO oficial do projeto
 exatamente esta estrutura, com duas abas:
 
   - "Resumo":
-      · título "Relatório de Radiação Solar" (A1:D1, fundo azul 1F5C8B);
+      · título "PIRAXIS — Relatório de Radiação Solar" (A1:D1, fundo azul 1F5C8B);
       · subtítulo dinâmico ``=B4&" • "&B8`` (Local • Período);
       · bloco "Informações Gerais" (Local, Latitude, Longitude, Altitude,
         Período, Fontes usadas, Passo temporal, E-mail SoDa, Data de geração);
@@ -371,7 +371,7 @@ def _escrever_resumo(
     # --- Título (A1:D1) ------------------------------------------------------
     ws.merge_cells("A1:D1")
     cel = ws["A1"]
-    cel.value = "Relatório de Radiação Solar"
+    cel.value = "PIRAXIS — Relatório de Radiação Solar"
     cel.font = _fonte_titulo
     cel.alignment = _centro
     for c in ws["A1:D1"][0]:
@@ -903,9 +903,9 @@ def _achatar(d: dict, prefixo: str = "") -> list[tuple[str, str]]:
 
 # ---------------------------------------------------------------------------
 def nome_arquivo_saida(local: str, data_inicio, data_fim) -> Path:
-    """Monta o caminho padrão de saída: radiacao_<local>_<ini>_<fim>.xlsx."""
+    """Monta o caminho padrão de saída: PIRAXIS_<local>_<ini>_<fim>.xlsx."""
     local_limpo = "".join(
         c if c.isalnum() else "_" for c in str(local)
     ).strip("_") or "local"
-    nome = f"radiacao_{local_limpo}_{data_inicio}_{data_fim}.xlsx"
+    nome = f"PIRAXIS_{local_limpo}_{data_inicio}_{data_fim}.xlsx"
     return OUTPUT_DIR / nome

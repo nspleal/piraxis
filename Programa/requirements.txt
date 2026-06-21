@@ -1,4 +1,4 @@
-# Dependências do Extrator de Radiação Solar (UNESP).
+# Dependências do PIRAXIS (extrator de radiação solar, UNESP).
 # Instale com:  pip install -r requirements.txt
 streamlit>=1.30
 pandas>=2.0

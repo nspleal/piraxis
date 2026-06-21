@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ===========================================================================
-#  EXTRATOR DE RADIAÇÃO SOLAR (UNESP)
+#  PIRAXIS — EXTRATOR DE RADIAÇÃO SOLAR (UNESP)
 #  Dê DOIS CLIQUES neste arquivo para abrir o programa (Mac e Linux).
 #
 #  Na PRIMEIRA vez ele instala tudo (demora alguns minutos, é normal).

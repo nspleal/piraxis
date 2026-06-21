@@ -1,1 +1,1 @@
-"""Pacote de testes do Extrator de Radiação Solar."""
+"""Pacote de testes do PIRAXIS (extrator de radiação solar)."""
