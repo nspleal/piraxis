@@ -1,0 +1,55 @@
+==============================================================
+  PIRAXIS — extrator de radiação solar (UNESP / FCA Botucatu)
+  COMO ABRIR (você NÃO precisa instalar Python)
+==============================================================
+
+Este pacote já vem com tudo dentro dele (o Python e as bibliotecas).
+Você não precisa instalar nada, não precisa de internet no primeiro
+uso e não precisa de permissão de administrador.
+
+--------------------------------------------------------------
+PASSO A PASSO
+--------------------------------------------------------------
+1. DESCOMPACTE o arquivo .zip em uma pasta SUA, onde você tenha
+   permissão para gravar — por exemplo a Área de Trabalho
+   (Desktop) ou Documentos.
+
+   IMPORTANTE: NÃO coloque em "Arquivos de Programas" /
+   "Program Files". O programa cria as pastas "cache" e "data"
+   dentro da própria pasta dele e precisa poder escrever ali.
+
+2. Dê DOIS CLIQUES no ícone de início:
+   - Windows:    INICIAR PIRAXIS.bat
+   - Mac/Linux:  Programa/INICIAR PIRAXIS (Mac e Linux).command
+
+3. Vai abrir uma janela preta (é normal) e, em seguida, o
+   programa abre sozinho no seu navegador. Para fechar o
+   programa, feche aquela janela preta.
+
+--------------------------------------------------------------
+PRIMEIRA VEZ NO MAC (aviso de segurança "Gatekeeper")
+--------------------------------------------------------------
+Na primeira vez, o macOS pode bloquear o arquivo .command.
+Se isso acontecer:
+   - Clique com o BOTÃO DIREITO no arquivo .command e escolha
+     "Abrir" (em vez de dois cliques); confirme "Abrir".
+   - OU, no Terminal, rode:
+       xattr -d com.apple.quarantine "INICIAR PIRAXIS (Mac e Linux).command"
+
+--------------------------------------------------------------
+CONTA SoDa (apenas para o CAMS McClear)
+--------------------------------------------------------------
+A fonte NASA POWER funciona sem cadastro. Para usar o
+CAMS McClear, crie uma conta gratuita em https://www.soda-pro.com
+e informe o e-mail na barra lateral do programa (ele fica salvo
+só na sua máquina, fora desta pasta).
+
+--------------------------------------------------------------
+ATUALIZAÇÕES
+--------------------------------------------------------------
+Quando houver uma versão nova só do programa (sem trocar as
+bibliotecas), basta substituir a pasta "Programa" pela nova que
+você receber — o restante do pacote continua igual. Se as
+bibliotecas mudarem, você receberá um pacote completo novo.
+
+==============================================================
