@@ -79,6 +79,10 @@ FORMATO_TIMESTAMP = "m/d/yy h:mm"   # formato 22 do Excel: exibe conforme o
                                     # idioma do sistema (dd/mm/aaaa hh:mm no
                                     # Windows em português)
 FORMATO_VALOR = "0.0"
+# Valores de radiação na tabela e nas estatísticas: 4 casas decimais (a mesma
+# precisão da fonte SoDa/McClear), para mostrar os dados EXATOS — sem arredondar
+# para 1 casa. O valor guardado na célula sempre foi exato; isto é só a exibição.
+FORMATO_DADOS = "0.0000"
 FORMATO_ENERGIA = "#,##0"
 FORMATO_KWH = "0.00"
 FORMATO_DIA = "dd/mm"
@@ -251,7 +255,7 @@ def _escrever_dados(
             valor = linha[col]
             cel = ws.cell(row=i, column=j)
             cel.value = None if pd.isna(valor) else float(valor)
-            cel.number_format = FORMATO_VALOR
+            cel.number_format = FORMATO_DADOS
             cel.font = _fonte_normal
 
     # --- Tabela estruturada TabDados (referenciada pelas fórmulas) ----------
@@ -493,8 +497,8 @@ def _escrever_resumo(
                 )
             else:  # passo mensal: nº de dias calculado em Python
                 valores[6] = f"=K{linha}/{n_dias}/1000"
-        formatos = [None, FORMATO_VALOR, FORMATO_VALOR, FORMATO_VALOR,
-                    FORMATO_VALOR, FORMATO_ENERGIA, FORMATO_KWH]
+        formatos = [None, FORMATO_DADOS, FORMATO_DADOS, FORMATO_DADOS,
+                    FORMATO_DADOS, FORMATO_ENERGIA, FORMATO_KWH]
         for j, (valor, fmt) in enumerate(zip(valores, formatos), start=6):
             cel = ws.cell(row=linha, column=j, value=valor)
             cel.font = _fonte_normal
