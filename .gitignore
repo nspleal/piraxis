@@ -18,6 +18,14 @@
 **/venv/
 **/env/
 
+# Empacotamento portátil (empacotar.py) — artefatos pesados/gerados
+dist/
+.empacotar_cache/
+*.zip
+empacotar.log
+Programa/VERSAO.txt
+/python/
+
 # Base de conhecimento externa (cofre/LLM Wiki) clonada localmente — nunca versionar aqui
 cofre/
 
