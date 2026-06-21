@@ -47,8 +47,10 @@ Projeto acadêmico da UNESP; local padrão **Botucatu/SP** (−22.8867, −48.44
   Excel: arquivo `PIRAXIS_<local>_<ini>_<fim>.xlsx` e título "PIRAXIS — Relatório de Radiação Solar".
   ⚠️ **PENDENTE (ação do pesquisador):** renomear o repositório no GitHub para `piraxis`
   (`gh repo rename piraxis`) — não há `gh`/ferramenta MCP de rename neste ambiente; o GitHub redireciona
-  o remoto antigo, mas convém atualizar a URL depois. ⚠️ Sem **símbolo/favicon PIRAXIS** no repo ainda
-  (favicon segue ☀️; a logo híbrida piranômetro+arco está só no handoff de branding do cofre).
+  o remoto antigo, mas convém atualizar a URL depois. ✅ **Símbolo/favicon PIRAXIS adicionado**
+  (logo híbrida piranômetro+arco): `app/assets/piraxis-symbol.svg` (vetorial, inline no cabeçalho) +
+  `app/assets/piraxis-icon.png` (favicon, fundo `#14181F` arredondado). Cabeçalho = símbolo + wordmark
+  **PIRAXIS** + subtítulo "extrator de radiação solar · UNESP / FCA Botucatu"; aba do navegador = símbolo.
 - **🎯 PRINCÍPIO DE FIDELIDADE (travado 2026-06-21):** toda extração deve sair **idêntica à sua
   fonte** — CAMS McClear no formato do CAMS; NASA POWER no formato da NASA. Hoje o Excel está fiel ao
   **CAMS** (período em faixa início–fim UTC, altitude do ponto, 4 casas decimais). ⚠️ **Ao trabalhar a
