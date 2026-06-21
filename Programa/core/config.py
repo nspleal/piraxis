@@ -119,6 +119,39 @@ COMPONENTES_RADIACAO: dict[str, dict[str, str]] = {
 
 
 # ---------------------------------------------------------------------------
+# Cores dos componentes para os gráficos (identidade visual — tema ESCURO)
+# ---------------------------------------------------------------------------
+# Cada componente tem uma cor fixa, em versões dessaturadas (terrosas, não vivas)
+# pensadas para fundo escuro. Convenção dos gráficos:
+#   - dado REAL (NASA POWER) ........ linha CHEIA na cor "saturada" (CORES);
+#   - modelo de CÉU LIMPO (McClear) . linha TRACEJADA numa versão mais clara
+#     (CORES_CEU_LIMPO).
+CORES: dict[str, str] = {  # dado real (com nuvens) — linha cheia
+    "TOA": "#9A8FC4",  # violeta acinzentado
+    "GHI": "#5E89B0",  # azul aço
+    "DHI": "#6FA6BE",  # azul-petróleo claro
+    "BHI": "#D9A45C",  # âmbar suave
+    "DNI": "#D98A55",  # terracota
+}
+CORES_CEU_LIMPO: dict[str, str] = {  # modelo McClear — linha tracejada (mais clara)
+    "TOA": "#BDB4DD",
+    "GHI": "#8FB0CC",
+    "DHI": "#9CC4D5",
+    "BHI": "#E8C593",
+    "DNI": "#E8B48C",
+}
+NOMES_COMPONENTES: dict[str, str] = {
+    "TOA": "Topo da atmosfera",
+    "GHI": "Global horizontal",
+    "DHI": "Difusa horizontal",
+    "BHI": "Feixe horizontal",
+    "DNI": "Direta normal",
+}
+# Ordem física da cascata de atenuação (TOA → GHI → DHI → BHI → DNI).
+ORDEM_CASCATA: tuple[str, ...] = ("TOA", "GHI", "DHI", "BHI", "DNI")
+
+
+# ---------------------------------------------------------------------------
 # Passos temporais suportados
 # ---------------------------------------------------------------------------
 # Mapeia rótulos amigáveis para os códigos ISO 8601 usados pelas APIs.

@@ -1,12 +1,11 @@
 [theme]
-base = "light"
-primaryColor = "#1F4E79"               # azul institucional (primária)
-backgroundColor = "#FFFFFF"
-secondaryBackgroundColor = "#F2F5F9"   # cinza-azulado claro (barra lateral, cards)
-textColor = "#1A1A1A"
+base = "dark"
+primaryColor = "#4A7AA8"               # azul institucional dessaturado (interativo)
+backgroundColor = "#14181F"            # carvão levemente azulado (fundo do app)
+secondaryBackgroundColor = "#1B212B"   # superfície (cards, barra lateral)
+textColor = "#E6E9EF"                  # texto principal
 font = "sans serif"
 
 [client]
 toolbarMode = "minimal"        # esconde o botão "Deploy" e reduz o menu do Streamlit
 showSidebarNavigation = false
-
