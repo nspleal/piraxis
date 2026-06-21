@@ -144,7 +144,8 @@ No início de TODA sessão:
 
 Antes de QUALQUER decisão importante:
 1. Veja o histórico recente:  grep -n "^## \[" cofre/wiki/log.md | tail -15  (e leia as relevantes).
-2. Aprofunde nas páginas do domínio meteo: cofre/wiki/entidades/extrator-radiacao-solar.md,
+2. Aprofunde nas páginas do domínio meteo: cofre/wiki/entidades/piraxis.md,
+   cofre/wiki/conceitos/identidade-visual-extrator.md, cofre/wiki/conceitos/fidelidade-a-fonte.md,
    cofre/wiki/conceitos/arquitetura-extrator-radiacao.md, cofre/wiki/conceitos/pipeline-e-validacao-radiacao.md,
    cofre/wiki/conceitos/componentes-irradiancia-solar.md, cofre/wiki/entidades/fontes-de-dados-candidatas.md.
 3. Respeite as decisões já travadas e a prioridade atual; se algo conflitar, aponte explicitamente.
