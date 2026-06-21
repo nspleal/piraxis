@@ -61,6 +61,13 @@ Projeto acadêmico da UNESP; local padrão **Botucatu/SP** (−22.8867, −48.44
   resposta crua em `self.resposta_crua`. A conferência **detecta e decodifica sozinha** um CSV aberto/
   salvo no Excel pt-BR (ponto decimal vira separador de milhar → valores ~10.000× maiores) e **avisa**
   quando a altitude do site difere da extração. Testes em `tests/test_conferencia.py`.
+- **✅ Excel: período (faixa) + valores exatos:** a 1ª coluna da aba "Dados" mostra o **PERÍODO** de
+  cada valor como faixa **início–fim (UTC)** (ex.: `01/01/2026 08:00–09:00`), idêntico ao "Observation
+  period" do site. ⚠️ Não havia defasagem de horário — o app sempre bateu com o site (verificado: Δ=0
+  em 240 h); era só convenção de rótulo (instante × intervalo). Valores saem com **4 casas decimais**
+  (`FORMATO_DADOS`), sem arredondar (o valor na célula sempre foi exato; mudou a exibição). Como a
+  coluna de período virou texto, a **tabela de Energia Diária por data foi removida** (a energia total
+  por componente continua no Resumo). Regressões em `tests/test_export.py`.
 - **Ambiente de nuvem:** sem rede para a API SoDa e sem e-mail → validações de API ficam PULADAS aqui;
   confirme na máquina local do pesquisador.
 
