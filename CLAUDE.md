@@ -45,9 +45,10 @@ Projeto acadêmico da UNESP; local padrão **Botucatu/SP** (−22.8867, −48.44
   este arquivo) — **nada da lógica** de extração/QC/conferência/export mudou. "extrator de radiação
   solar" segue como **descrição/subtítulo** (minúsculo). Título visível e aba do navegador = **PIRAXIS**;
   Excel: arquivo `PIRAXIS_<local>_<ini>_<fim>.xlsx` e título "PIRAXIS — Relatório de Radiação Solar".
-  ⚠️ **PENDENTE (ação do pesquisador):** renomear o repositório no GitHub para `piraxis`
-  (`gh repo rename piraxis`) — não há `gh`/ferramenta MCP de rename neste ambiente; o GitHub redireciona
-  o remoto antigo, mas convém atualizar a URL depois. ✅ **Símbolo/favicon PIRAXIS adicionado**
+  ✅ **Repositório renomeado no GitHub para `nspleal/piraxis` (2026-06-21):** feito pelo pesquisador via
+  Settings; o GitHub redireciona a URL antiga (`nspleal/IC-dal-pai`), então clones/PRs/histórico seguem
+  válidos. ⚠️ O escopo desta sessão de nuvem ainda lista o slug antigo (`nspleal/ic-dal-pai`) —
+  inofensivo (redireciona). ✅ **Símbolo/favicon PIRAXIS adicionado**
   (logo híbrida piranômetro+arco): `app/assets/piraxis-symbol.svg` (vetorial, inline no cabeçalho) +
   `app/assets/piraxis-icon.png` (favicon, fundo `#14181F` arredondado). Cabeçalho = símbolo + wordmark
   **PIRAXIS** + subtítulo "extrator de radiação solar · UNESP / FCA Botucatu"; aba do navegador = símbolo.
