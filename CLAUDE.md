@@ -12,7 +12,8 @@ Projeto acadêmico da UNESP; local padrão **Botucatu/SP** (−22.8867, −48.44
 
 ## 2. Mapa de pastas/módulos (tudo dentro de `Programa/`)
 - `Programa/` — o projeto; a raiz só tem o launcher + esta pasta.
-- `core/config.py` — `Local`, `BOTUCATU`, componentes (TOA/GHI/DNI/DHI/**BHI**), passos, caminhos.
+- `core/config.py` — `Local`, `BOTUCATU`, componentes (TOA/GHI/DNI/DHI/**BHI**), passos, caminhos
+  e as **cores da identidade visual** (`CORES`/`CORES_CEU_LIMPO`/`NOMES_COMPONENTES`/`ORDEM_CASCATA`).
 - `core/credenciais.py` — e-mail SoDa por máquina (`~/.radiacao_solar/config.json`).
 - `core/combinador.py` — une as fontes por timestamp; calcula `kt` (índice de claridade).
 - `core/qualidade.py` — QC físico (lacunas, negativos, noturno, envelope, fechamento, concordância).
@@ -23,7 +24,9 @@ Projeto acadêmico da UNESP; local padrão **Botucatu/SP** (−22.8867, −48.44
 - `sources/cams_mcclear.py` — cliente McClear via `pvlib.iotools.get_cams` (cache-first, contador de API).
 - `sources/nasa_power.py` — cliente NASA POWER (REST, −999→NaN, normaliza unidade).
 - `output/exporta_excel.py` — Excel no modelo do pesquisador (abas Resumo, Gráficos, Dados, Qualidade, Reprodutibilidade).
-- `app/streamlit_app.py` — interface (cards, gráficos Plotly, painel de QC, downloads).
+- `app/streamlit_app.py` — interface **tema escuro, 4 abas** (Painel, Série temporal, Conferência, Dados);
+  barra lateral de configuração; cards, cascata de atenuação, fechamento, gráficos Plotly, QC, downloads.
+- `app/assets/` — logos UNESP (variante escura `unesp-horizontal-dark.png`) + `.streamlit/config.toml` (tema escuro).
 - `tests/` — `pytest` (mockado, sem rede) + scripts `validar_*.py` (suíte de validação).
 - `INICIAR EXTRATOR DE RADIAÇÃO.bat` / `Programa/INICIAR (Mac e Linux).command` — launchers.
 
@@ -83,6 +86,22 @@ Projeto acadêmico da UNESP; local padrão **Botucatu/SP** (−22.8867, −48.44
   `LEFT(...,10)`), energia média diária por componente (referencia o Resumo) e **3 gráficos** (perfil
   temporal com cores fixas por componente; energia diária; energia média). Tudo **genérico** sobre os
   componentes presentes (CAMS/NASA/combinado). Regressões em `tests/test_export.py`.
+- **✅ Identidade visual ESCURA — REDESENHO COMPLETO (4 telas, 2026-06-21):** o app passou de página
+  única clara para **tema escuro** (painel de instrumento científico) com **4 abas** (Painel · Série
+  temporal · Conferência · Dados) e barra lateral fixa. Direção definida pelo pesquisador (mockup
+  escuro autoritativo). Tokens: fundo `#14181F`, superfícies `#1B212B`/`#222A36`, texto
+  `#E6E9EF`/`#9AA5B3`/`#646F7E`, azul interativo `#34618F`/`#4A7AA8`, âmbar `#E0A050` (só o **kt**),
+  verde de validação `#6FA67E`. Fontes: **Space Grotesk** (títulos), **JetBrains Mono** (números),
+  system-ui (texto). Cores por componente em `core/config.py` (`CORES` real / `CORES_CEU_LIMPO`
+  tracejado). Convenção dos gráficos: **real (NASA) = linha cheia; céu limpo (McClear) = tracejada**
+  (a distinção só aparece quando as duas fontes estão presentes; fonte única = linha cheia). Elemento
+  de assinatura: **cascata de atenuação** (TOA→GHI→DHI→BHI→DNI, % da irradiância no topo) + painel de
+  **fechamento GHI = BHI + DHI** (Δ validado). Painel: cards de integral diária (kWh/m²·dia) + pico +
+  **kt**. Conferência: tabela de fechamento por registro + QC + fidelidade com o site + auditoria.
+  Dados: tabela completa + export Excel/CSV + reprodutibilidade. **Toda a lógica de extração/QC/export
+  foi preservada** — só a apresentação mudou. Verificado: `pytest` 47/47, `validar_app` APROVADO,
+  `validar_boot` APROVADO. ⚠️ Streamlit não é pixel-perfect — alvo é **fiel ao espírito** do mockup
+  (não réplica exata). EM ABERTO: refinos finos de espaçamento/animações de entrada (Streamlit limita).
 - **Ambiente de nuvem:** sem rede para a API SoDa e sem e-mail → validações de API ficam PULADAS aqui;
   confirme na máquina local do pesquisador.
 
