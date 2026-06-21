@@ -75,15 +75,10 @@ def test_estrutura_basica_do_modelo(tmp_path):
     tab = ws.tables["TabDados"]
     assert tab.ref == "A1:E73"
     assert [c.name for c in tab.tableColumns] == [
-        "Timestamp", "GHI (W/m²)", "DNI (W/m²)", "DHI (W/m²)", "BHI (W/m²)",
+        "Período (UTC)", "GHI (W/m²)", "DNI (W/m²)", "DHI (W/m²)", "BHI (W/m²)",
     ]
-    # Tabela auxiliar de Energia Diária (3 dias -> 3 linhas a partir de G25).
-    assert ws["G24"].value == "Dia"
-    assert ws["H24"].value == "GHI (Wh/m²)"
-    assert ws["G25"].value == "=DATE(2026,1,1)"
-    assert ws["G26"].value == "=G25+1"
-    assert ws["H25"].value.startswith("=SUMIFS(TabDados[GHI (W/m²)]")
-    assert ws["G28"].value is None  # só 3 dias
+    # A 1ª coluna mostra a FAIXA início–fim (UTC), espelhando o site.
+    assert ws["A2"].value == "01/01/2026 00:00–01:00"
 
 
 def test_resumo_formulas_e_metadados(tmp_path):
@@ -115,10 +110,10 @@ def test_resumo_formulas_e_metadados(tmp_path):
         '=_xlfn.MINIFS(TabDados[GHI (W/m²)],TabDados[GHI (W/m²)],">0")'
     )
     assert r["K4"].value == "=SUM(TabDados[GHI (W/m²)])"
-    assert r["L4"].value == "=K4/(COUNT(TabDados[Timestamp])/24)/1000"
+    assert r["L4"].value == "=K4/3/1000"  # 72 h = 3 dias
 
 
-def test_tres_graficos_do_modelo(tmp_path):
+def test_graficos_do_modelo(tmp_path):
     caminho = tmp_path / "saida.xlsx"
     exporta(_df_uma_fonte(), _metadados(), caminho)
 
@@ -128,10 +123,12 @@ def test_tres_graficos_do_modelo(tmp_path):
         for aba in wb.worksheets
         for ch in aba._charts
     ]
+    # Resumo: barras comparativas; Dados: linha ao longo do tempo. (A tabela e o
+    # gráfico de Energia Diária por data saíram porque a coluna de período virou
+    # texto, faixa início–fim, igual ao site.)
     assert tipos == [
         ("Resumo", "BarChart"),
         ("Dados", "LineChart"),
-        ("Dados", "BarChart"),
     ]
 
 
@@ -231,4 +228,4 @@ def test_passo_diario_usa_unidade_wh(tmp_path):
 
     wb = load_workbook(caminho)
     assert wb["Dados"]["B1"].value == "GHI (Wh/m²)"
-    assert wb["Resumo"]["L4"].value == "=K4/(COUNT(TabDados[Timestamp])/1)/1000"
+    assert wb["Resumo"]["L4"].value == "=K4/10/1000"  # 10 dias

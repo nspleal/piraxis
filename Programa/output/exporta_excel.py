@@ -136,6 +136,28 @@ def _rotulo_coluna(col: str, unidade: str) -> str:
     return f"{col} ({unidade})"
 
 
+def _rotulo_periodo(ts_inicio, passo: str) -> str | None:
+    """Texto do PERÍODO de integração (UTC) de um valor, espelhando o
+    'Observation period' do site da SoDa. Ex. (horário): '01/01/2026 08:00–09:00'.
+    """
+    if ts_inicio is None or pd.isna(ts_inicio):
+        return None
+    ini = pd.Timestamp(ts_inicio)
+    if passo == "1M":
+        return ini.strftime("%m/%Y")
+    if passo == "1d":
+        return ini.strftime("%d/%m/%Y")
+    delta = {
+        "1min": pd.Timedelta(minutes=1),
+        "15min": pd.Timedelta(minutes=15),
+        "1h": pd.Timedelta(hours=1),
+    }.get(passo, pd.Timedelta(hours=1))
+    fim = ini + delta
+    if fim.normalize() == ini.normalize():
+        return f"{ini.strftime('%d/%m/%Y %H:%M')}–{fim.strftime('%H:%M')}"
+    return f"{ini.strftime('%d/%m/%Y %H:%M')}–{fim.strftime('%d/%m/%Y %H:%M')}"
+
+
 # ---------------------------------------------------------------------------
 # Função principal
 # ---------------------------------------------------------------------------
@@ -232,9 +254,10 @@ def _escrever_dados(
     passo: str,
     n_dias: int,
 ) -> dict[str, str]:
-    """Escreve a TabDados, a tabela de Energia Diária e os dois gráficos."""
+    """Escreve a TabDados (coluna de PERÍODO início–fim, igual ao site) e o
+    gráfico de radiação ao longo do tempo."""
     rotulos = {c: _rotulo_coluna(c, unidade) for c in colunas_numericas}
-    cabecalho = ["Timestamp"] + [rotulos[c] for c in colunas_numericas]
+    cabecalho = ["Período (UTC)"] + [rotulos[c] for c in colunas_numericas]
     n_linhas = len(df)
 
     # --- Cabeçalho (branco/negrito sobre azul, centralizado) ----------------
@@ -247,9 +270,9 @@ def _escrever_dados(
     # --- Linhas de dados (NaN -> célula vazia, nunca zero inventado) --------
     for i, (_, linha) in enumerate(df.iterrows(), start=2):
         cel = ws.cell(row=i, column=1)
-        ts = pd.to_datetime(linha.get("timestamp"))
-        cel.value = None if pd.isna(ts) else ts.to_pydatetime()
-        cel.number_format = FORMATO_TIMESTAMP
+        cel.value = _rotulo_periodo(linha.get("timestamp"), passo)
+        cel.number_format = "@"
+        cel.alignment = Alignment(horizontal="left")
         cel.font = _fonte_normal
         for j, col in enumerate(colunas_numericas, start=2):
             valor = linha[col]
@@ -276,63 +299,15 @@ def _escrever_dados(
     for j in range(2, len(cabecalho) + 1):
         ws.column_dimensions[get_column_letter(j)].width = 16.0
 
-    # --- Tabela auxiliar de Energia Diária (G24 no modelo) ------------------
-    # Usa as duas primeiras colunas de radiação, preferindo GHI e depois DNI.
+    # --- Gráfico de linha: radiação ao longo do tempo -----------------------
+    # Séries: até duas colunas, preferindo GHI* e depois DNI* (como no modelo).
+    # Obs.: a tabela de "Energia Diária por data" foi removida porque a coluna de
+    # período virou texto (faixa início–fim, igual ao site), e o SUMIFS por data
+    # exigiria datas calculáveis. A energia total por componente segue no Resumo.
     preferidas = [c for c in componentes if c.upper().startswith("GHI")]
     preferidas += [c for c in componentes if c.upper().startswith("DNI")]
     preferidas += [c for c in componentes if c not in preferidas]
-    cols_energia = preferidas[:2]
-
-    # G no modelo; desloca para a direita se a TabDados for mais larga.
-    col_ini = max(7, len(cabecalho) + 2)
-    letra_dia = get_column_letter(col_ini)
-    linha_cab = 24
-    gerar_energia = (
-        passo != "1M" and bool(cols_energia) and n_linhas > 0
-        and n_dias <= MAX_DIAS_ENERGIA
-    )
-
-    if gerar_energia:
-        ws.column_dimensions[letra_dia].width = 13.3
-        cel = ws.cell(row=linha_cab, column=col_ini, value="Dia")
-        cel.font = _fonte_cab
-        cel.fill = _fill_azul
-        cel.alignment = _centro
-        for k, col in enumerate(cols_energia, start=1):
-            letra = get_column_letter(col_ini + k)
-            ws.column_dimensions[letra].width = 20.0
-            cel = ws.cell(row=linha_cab, column=col_ini + k, value=f"{col} (Wh/m²)")
-            cel.font = _fonte_cab
-            cel.fill = _fill_azul
-            cel.alignment = _centro
-
-        primeiro_dia = df["timestamp"].dropna().min()
-        for d in range(n_dias):
-            r = linha_cab + 1 + d
-            cel = ws.cell(row=r, column=col_ini)
-            if d == 0:
-                cel.value = (
-                    f"=DATE({primeiro_dia.year},{primeiro_dia.month},"
-                    f"{primeiro_dia.day})"
-                )
-            else:
-                cel.value = f"={letra_dia}{r - 1}+1"
-            cel.number_format = FORMATO_DIA
-            cel.font = _fonte_normal
-            for k, col in enumerate(cols_energia, start=1):
-                rot = rotulos[col]
-                cel = ws.cell(row=r, column=col_ini + k)
-                cel.value = (
-                    f"=SUMIFS(TabDados[{rot}],"
-                    f'TabDados[Timestamp],">="&${letra_dia}{r},'
-                    f'TabDados[Timestamp],"<"&${letra_dia}{r}+1)'
-                )
-                cel.number_format = FORMATO_ENERGIA
-                cel.font = _fonte_normal
-
-    # --- Gráfico de linha: radiação ao longo do tempo -----------------------
-    # Séries: até duas colunas, preferindo GHI* e depois DNI* (como no modelo).
-    cols_linha = cols_energia
+    cols_linha = preferidas[:2]
     if n_linhas > 0 and cols_linha:
         grafico = LineChart()
         nomes = " e ".join(cols_linha)
@@ -357,34 +332,7 @@ def _escrever_dados(
             serie.graphicalProperties = GraphicalProperties(
                 ln=LineProperties(w=LARGURA_LINHA_GRAFICO)
             )
-        ws.add_chart(grafico, f"{letra_dia}2")
-
-    # --- Gráfico de barras: Energia Diária -----------------------------------
-    if gerar_energia:
-        grafico = BarChart()
-        grafico.type = "col"
-        grafico.grouping = "clustered"
-        grafico.gapWidth = 219
-        grafico.overlap = -27
-        grafico.title = "Energia Diária (Wh/m²)"
-        grafico.legend.position = "b"
-        grafico.height = 7.5
-        grafico.width = 15
-        grafico.y_axis.number_format = FORMATO_ENERGIA
-        grafico.x_axis.number_format = FORMATO_DIA
-        dados = Reference(
-            ws,
-            min_col=col_ini + 1,
-            max_col=col_ini + len(cols_energia),
-            min_row=linha_cab,
-            max_row=linha_cab + n_dias,
-        )
-        cats = Reference(
-            ws, min_col=col_ini, min_row=linha_cab + 1, max_row=linha_cab + n_dias
-        )
-        grafico.add_data(dados, titles_from_data=True)
-        grafico.set_categories(cats)
-        ws.add_chart(grafico, f"{get_column_letter(col_ini + 4)}{linha_cab}")
+        ws.add_chart(grafico, f"{get_column_letter(len(cabecalho) + 2)}2")
 
     return rotulos
 
@@ -477,9 +425,6 @@ def _escrever_resumo(
         cel.alignment = _centro_total
         cel.border = _borda_fina
 
-    # Divisor do kWh/m²/dia conforme o passo (ver docstring do módulo).
-    passos_por_dia = {"1min": 1440, "15min": 96, "1h": 24, "1d": 1}.get(passo)
-
     linha = 4
     for k, comp in enumerate(componentes):
         rot = rotulos[comp]
@@ -491,12 +436,10 @@ def _escrever_resumo(
             valores[3] = f"=MAX(TabDados[{rot}])"
             valores[4] = f'=_xlfn.MINIFS(TabDados[{rot}],TabDados[{rot}],">0")'
             valores[5] = f"=SUM(TabDados[{rot}])"
-            if passos_por_dia is not None:
-                valores[6] = (
-                    f"=K{linha}/(COUNT(TabDados[Timestamp])/{passos_por_dia})/1000"
-                )
-            else:  # passo mensal: nº de dias calculado em Python
-                valores[6] = f"=K{linha}/{n_dias}/1000"
+            # Energia média por dia = total / nº de dias do período (calculado em
+            # Python). Não usa COUNT na coluna de período porque ela agora é texto
+            # (faixa início–fim, igual ao site).
+            valores[6] = f"=K{linha}/{n_dias}/1000"
         formatos = [None, FORMATO_DADOS, FORMATO_DADOS, FORMATO_DADOS,
                     FORMATO_DADOS, FORMATO_ENERGIA, FORMATO_KWH]
         for j, (valor, fmt) in enumerate(zip(valores, formatos), start=6):
