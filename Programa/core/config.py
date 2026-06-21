@@ -2,7 +2,7 @@
 core/config.py
 ==============
 
-Configurações centrais do Extrator de Radiação Solar.
+Configurações centrais do PIRAXIS (extrator de radiação solar).
 
 Reúne, num único lugar:
   - a dataclass ``Local`` (ponto geográfico de estudo) e o ponto padrão Botucatu;

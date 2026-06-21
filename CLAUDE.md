@@ -1,4 +1,4 @@
-# CLAUDE.md — Extrator de Radiação Solar (IC-dal-pai)
+# CLAUDE.md — PIRAXIS (extrator de radiação solar)
 
 > Guia ENXUTO para sessões do Claude Code. O conhecimento profundo (decisões,
 > arquitetura, roadmap) vive no **cofre** (LLM Wiki) — ver bloco no fim. **Não
@@ -28,16 +28,27 @@ Projeto acadêmico da UNESP; local padrão **Botucatu/SP** (−22.8867, −48.44
   barra lateral de configuração; cards, cascata de atenuação, fechamento, gráficos Plotly, QC, downloads.
 - `app/assets/` — logos UNESP (variante escura `unesp-horizontal-dark.png`) + `.streamlit/config.toml` (tema escuro).
 - `tests/` — `pytest` (mockado, sem rede) + scripts `validar_*.py` (suíte de validação).
-- `INICIAR EXTRATOR DE RADIAÇÃO.bat` / `Programa/INICIAR (Mac e Linux).command` — launchers.
+- `INICIAR PIRAXIS.bat` / `Programa/INICIAR PIRAXIS (Mac e Linux).command` — launchers.
 
 ## 3. Como rodar e testar
-- **Rodar:** dois cliques no `INICIAR EXTRATOR DE RADIAÇÃO.bat` (cria `.venv`, instala, abre o app).
+- **Rodar:** dois cliques no `INICIAR PIRAXIS.bat` (cria `.venv`, instala, abre o app).
   Manual: dentro de `Programa/` → `streamlit run app/streamlit_app.py`.
 - **Testes unitários:** dentro de `Programa/` → `python -m pytest` (sem rede).
 - **Validação completa:** `python tests/rodar_validacao_completa.py` (lê o e-mail SoDa de
   `~/.radiacao_solar/config.json` > `SODA_EMAIL` > `--email`; itens de API ficam PULADOS sem e-mail).
 
 ## 4. Estado e KNOWN ISSUES (desta sessão; podem não estar no código)
+- **✅ NOME OFICIAL: PIRAXIS (travado 2026-06-21):** o projeto chama-se **PIRAXIS** (grafia com **I**,
+  SEMPRE MAIÚSCULAS; de *piranômetro* + *axis*). O repositório é **`piraxis`** (codinome antigo:
+  `IC-dal-pai`, referência aos **Profs. Dal Pai** — preservar o sobrenome em créditos/citações).
+  O rename foi **só de apresentação/metadados** (UI, Excel, launchers, docstrings, README, pyproject,
+  este arquivo) — **nada da lógica** de extração/QC/conferência/export mudou. "extrator de radiação
+  solar" segue como **descrição/subtítulo** (minúsculo). Título visível e aba do navegador = **PIRAXIS**;
+  Excel: arquivo `PIRAXIS_<local>_<ini>_<fim>.xlsx` e título "PIRAXIS — Relatório de Radiação Solar".
+  ⚠️ **PENDENTE (ação do pesquisador):** renomear o repositório no GitHub para `piraxis`
+  (`gh repo rename piraxis`) — não há `gh`/ferramenta MCP de rename neste ambiente; o GitHub redireciona
+  o remoto antigo, mas convém atualizar a URL depois. ⚠️ Sem **símbolo/favicon PIRAXIS** no repo ainda
+  (favicon segue ☀️; a logo híbrida piranômetro+arco está só no handoff de branding do cofre).
 - **🎯 PRINCÍPIO DE FIDELIDADE (travado 2026-06-21):** toda extração deve sair **idêntica à sua
   fonte** — CAMS McClear no formato do CAMS; NASA POWER no formato da NASA. Hoje o Excel está fiel ao
   **CAMS** (período em faixa início–fim UTC, altitude do ponto, 4 casas decimais). ⚠️ **Ao trabalhar a

@@ -2,8 +2,8 @@
 app/streamlit_app.py
 ====================
 
-Interface visual (Streamlit) do Extrator de Radiação Solar — ponto de entrada
-do pesquisador. Tudo em português.
+Interface visual (Streamlit) do PIRAXIS (extrator de radiação solar) — ponto de
+entrada do pesquisador. Tudo em português.
 
 Identidade visual (2026-06-21): **tema escuro** sóbrio, no espírito de um painel
 de instrumento científico (não um dashboard chamativo). Fundo carvão levemente
@@ -68,7 +68,7 @@ logging.basicConfig(
 )
 
 st.set_page_config(
-    page_title="Extrator de Radiação Solar — UNESP",
+    page_title="PIRAXIS — UNESP",
     page_icon="☀️",
     layout="wide",
 )
@@ -606,8 +606,8 @@ def _cabecalho() -> None:
         "<div class='rad-header'>"
         "<div class='rad-header-left'>"
         f"{logo_html}"
-        "<div><div class='rad-title'>Extrator de radiação solar</div>"
-        f"<div class='rad-subtitle'>{nome_local} · irradiância de superfície</div></div>"
+        "<div><div class='rad-title' style='letter-spacing:3px'>PIRAXIS</div>"
+        f"<div class='rad-subtitle'>extrator de radiação solar · {nome_local}</div></div>"
         "</div>"
         "<div style='display:flex;align-items:center'>"
         f"<span class='rad-pill'><span class='rad-dot' style='background:{AMBAR}'></span>"
@@ -1127,7 +1127,7 @@ with aba_dados:
 # ---------------------------------------------------------------------------
 st.markdown(
     f"<div style='margin-top:28px;padding-top:14px;border-top:0.5px solid {BORDA};"
-    f"font-size:11px;color:{TXT3}'>Extrator de Radiação Solar · Ferramenta "
-    f"acadêmica da UNESP · {date.today().year} · horários em UTC</div>",
+    f"font-size:11px;color:{TXT3}'>PIRAXIS · extrator de radiação solar · "
+    f"Ferramenta acadêmica da UNESP · {date.today().year} · horários em UTC</div>",
     unsafe_allow_html=True,
 )

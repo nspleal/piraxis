@@ -27,7 +27,7 @@ from pathlib import Path
 
 import pandas as pd
 
-NOME_FERRAMENTA = "Extrator de Radiação Solar (UNESP)"
+NOME_FERRAMENTA = "PIRAXIS — extrator de radiação solar (UNESP)"
 VERSAO_FERRAMENTA = "1.0"
 
 # ---------------------------------------------------------------------------

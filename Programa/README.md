@@ -1,4 +1,4 @@
-# ☀️ Extrator de Radiação Solar (UNESP)
+# ☀️ PIRAXIS — extrator de radiação solar (UNESP)
 
 Ferramenta **local** (roda no seu computador, sem nada na nuvem) para **extrair,
 comparar e exportar** dados de **radiação solar** de um ponto geográfico para uma
@@ -47,9 +47,9 @@ entrar nela).
 
 Dê **dois cliques** no ícone de início:
 
-- **Windows:** **`INICIAR EXTRATOR DE RADIAÇÃO.bat`** ← é só esse, o único ícone.
+- **Windows:** **`INICIAR PIRAXIS.bat`** ← é só esse, o único ícone.
 - **Mac/Linux:** abra a pasta `Programa` e dê dois cliques em
-  **`INICIAR (Mac e Linux).command`**.
+  **`INICIAR PIRAXIS (Mac e Linux).command`**.
 
 Na **primeira vez**, ele instala tudo o que é necessário (pode demorar alguns
 minutos — é normal) e abre o aplicativo no navegador. Nas próximas vezes abre
@@ -68,7 +68,7 @@ direto. Para encerrar, feche a janela preta que aparece.
 
 ## Primeiro uso
 
-1. **Abra a ferramenta** (dois cliques no `INICIAR EXTRATOR DE RADIAÇÃO.bat`).
+1. **Abra a ferramenta** (dois cliques no `INICIAR PIRAXIS.bat`).
 2. Para usar a **NASA POWER**, não precisa fazer nada: já funciona.
 3. Para usar o **CAMS McClear**, você precisa de uma **conta gratuita** no SoDa:
    - Acesse [soda-pro.com](https://www.soda-pro.com) e **crie sua conta** com seu
@@ -95,7 +95,7 @@ e-mail salvo na máquina. Para gravar como padrão da máquina, use o botão
 
 ## A planilha gerada
 
-O arquivo `radiacao_<local>_<inicio>_<fim>.xlsx` é salvo na pasta `data/` e segue
+O arquivo `PIRAXIS_<local>_<inicio>_<fim>.xlsx` é salvo na pasta `data/` e segue
 o **modelo oficial do projeto** (planilha_modelo_para_IC), com duas abas:
 
 - **Resumo** — título, informações gerais do estudo e a tabela "Estatísticas de
@@ -171,7 +171,7 @@ A geometria solar (posição do Sol) é calculada com a biblioteca **pvlib**.
 
 ```
 Pasta-do-projeto/
-├── INICIAR EXTRATOR DE RADIAÇÃO.bat   # ⭐ O único ícone: dois cliques aqui (Windows)
+├── INICIAR PIRAXIS.bat               # ⭐ O único ícone: dois cliques aqui (Windows)
 └── Programa/                          # Todo o funcionamento interno (não precisa entrar)
     ├── app/streamlit_app.py     # Interface (ponto de entrada do usuário)
     ├── core/
@@ -186,7 +186,7 @@ Pasta-do-projeto/
     ├── cache/                   # Cache local (criado em runtime)
     ├── data/                    # Planilhas geradas (criado em runtime)
     ├── tests/                   # Testes pytest (sem rede real)
-    ├── INICIAR (Mac e Linux).command  # Início para Mac/Linux
+    ├── INICIAR PIRAXIS (Mac e Linux).command  # Início para Mac/Linux
     ├── requirements.txt
     ├── pyproject.toml
     └── README.md

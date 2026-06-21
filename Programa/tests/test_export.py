@@ -85,7 +85,7 @@ def test_resumo_estatisticas_em_a16(tmp_path):
     exporta(_df_uma_fonte(), _metadados(), caminho)
 
     r = load_workbook(caminho)["Resumo"]
-    assert r["A1"].value == "Relatório de Radiação Solar"
+    assert r["A1"].value == "PIRAXIS — Relatório de Radiação Solar"
     assert r["A2"].value == '=B4&" • "&B8'
     assert r["A3"].value == "Informações Gerais"
     rotulos = [r.cell(row=i, column=1).value for i in range(4, 13)]
