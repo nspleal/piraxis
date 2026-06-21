@@ -1,14 +1,14 @@
 """
-Testes do exportador Excel (output/exporta_excel.py) — formato do MODELO
-oficial (planilha_modelo_para_IC.xlsx):
+Testes do exportador Excel (output/exporta_excel.py) — modelo do pesquisador:
 
-  - duas abas: Resumo e Dados (a antiga "Comparação" foi aposentada);
-  - aba Dados com a tabela estruturada ``TabDados`` (colunas "Timestamp" +
-    "<COMPONENTE> (W/m²)") e a tabela auxiliar de Energia Diária;
-  - aba Resumo com metadados, estatísticas por FÓRMULA sobre a TabDados
-    (AVERAGE/AVERAGEIF/MAX/MINIFS/SUM/kWh por dia) e legenda;
-  - três gráficos (barras no Resumo; linha + barras de energia nos Dados);
-  - kt presente nos dados mas fora das estatísticas; NaN vira célula vazia.
+  - abas: Resumo, Gráficos, Dados (+ Qualidade, Reprodutibilidade quando há);
+  - Dados: tabela estruturada ``TabDados`` (coluna "Período (UTC)" em faixa
+    início–fim + "<COMPONENTE> (unidade)") e gráfico de linha;
+  - Resumo: metadados, estatísticas por FÓRMULA em A16:G (AVERAGE/AVERAGEIF/
+    MAX/MINIFS/SUM/kWh por dia) e gráfico comparativo no topo direito (F1);
+  - Gráficos: energia diária por dia (SUMPRODUCT sobre o texto do período) +
+    energia média diária por componente + 3 gráficos;
+  - valores com 4 casas (precisão da fonte); kt fora das estatísticas.
 """
 
 from __future__ import annotations
@@ -66,12 +66,11 @@ def test_estrutura_basica_do_modelo(tmp_path):
     exporta(_df_uma_fonte(), _metadados(), caminho)
 
     wb = load_workbook(caminho)
-    # Só as duas abas do modelo, na ordem Resumo -> Dados.
-    assert wb.sheetnames == ["Resumo", "Dados"]
+    # Ordem do modelo: Resumo -> Gráficos -> Dados.
+    assert wb.sheetnames == ["Resumo", "Gráficos", "Dados"]
 
     ws = wb["Dados"]
     assert ws.freeze_panes == "A2"
-    # Tabela estruturada com os nomes de coluna do modelo.
     tab = ws.tables["TabDados"]
     assert tab.ref == "A1:E73"
     assert [c.name for c in tab.tableColumns] == [
@@ -81,13 +80,13 @@ def test_estrutura_basica_do_modelo(tmp_path):
     assert ws["A2"].value == "01/01/2026 00:00–01:00"
 
 
-def test_resumo_formulas_e_metadados(tmp_path):
+def test_resumo_estatisticas_em_a16(tmp_path):
     caminho = tmp_path / "saida.xlsx"
     exporta(_df_uma_fonte(), _metadados(), caminho)
 
     r = load_workbook(caminho)["Resumo"]
     assert r["A1"].value == "Relatório de Radiação Solar"
-    assert r["A2"].value == '=B4&" • "&B8'  # subtítulo dinâmico do modelo
+    assert r["A2"].value == '=B4&" • "&B8'
     assert r["A3"].value == "Informações Gerais"
     rotulos = [r.cell(row=i, column=1).value for i in range(4, 13)]
     assert rotulos == [
@@ -97,20 +96,39 @@ def test_resumo_formulas_e_metadados(tmp_path):
     ]
     assert r["B12"].number_format == "@"
 
-    # Cabeçalho e fórmulas da tabela de estatísticas (linha do GHI).
-    assert [r.cell(row=3, column=j).value for j in range(6, 13)] == [
+    # Estatísticas agora em A14 (título) / A16 (cabeçalho) / A17+ (dados).
+    assert r["A14"].value == "Estatísticas de Radiação (W/m²)"
+    assert [r.cell(row=16, column=j).value for j in range(1, 8)] == [
         "Componente", "Média", "Média Diurna", "Máximo", "Mínimo Diurno",
         "Energia (Wh/m²)", "kWh/m²/dia",
     ]
-    assert r["F4"].value == "GHI"
-    assert r["G4"].value == "=AVERAGE(TabDados[GHI (W/m²)])"
-    assert r["H4"].value == '=AVERAGEIF(TabDados[GHI (W/m²)],">0")'
-    assert r["I4"].value == "=MAX(TabDados[GHI (W/m²)])"
-    assert r["J4"].value == (
+    assert r["A17"].value == "GHI"
+    assert r["B17"].value == "=AVERAGE(TabDados[GHI (W/m²)])"
+    assert r["C17"].value == '=AVERAGEIF(TabDados[GHI (W/m²)],">0")'
+    assert r["D17"].value == "=MAX(TabDados[GHI (W/m²)])"
+    assert r["E17"].value == (
         '=_xlfn.MINIFS(TabDados[GHI (W/m²)],TabDados[GHI (W/m²)],">0")'
     )
-    assert r["K4"].value == "=SUM(TabDados[GHI (W/m²)])"
-    assert r["L4"].value == "=K4/3/1000"  # 72 h = 3 dias
+    assert r["F17"].value == "=SUM(TabDados[GHI (W/m²)])"
+    assert r["G17"].value == "=F17/3/1000"  # 72 h = 3 dias
+    assert r["B17"].number_format == "0.0000"
+
+
+def test_aba_graficos(tmp_path):
+    caminho = tmp_path / "saida.xlsx"
+    exporta(_df_uma_fonte(), _metadados(), caminho)
+
+    g = load_workbook(caminho)["Gráficos"]
+    assert g["A1"].value == "Gráficos de Radiação Solar"
+    assert g["A3"].value == "Energia diária por dia (kWh/m²)"
+    assert g["A4"].value == "Data" and g["B4"].value == "GHI"
+    assert g["A5"].value == "=DATE(2026,1,1)"
+    # SUMPRODUCT que soma por dia a partir do TEXTO do período.
+    assert "SUMPRODUCT" in g["B5"].value and "GHI (W/m²)" in g["B5"].value
+    # Energia média diária por componente referencia o Resumo.
+    assert g["A10"].value == "Energia média diária por componente (kWh/m²/dia)"
+    assert g["A12"].value == "=Resumo!A17"
+    assert g["B12"].value == "=Resumo!G17"
 
 
 def test_graficos_do_modelo(tmp_path):
@@ -123,11 +141,13 @@ def test_graficos_do_modelo(tmp_path):
         for aba in wb.worksheets
         for ch in aba._charts
     ]
-    # Resumo: barras comparativas; Dados: linha ao longo do tempo. (A tabela e o
-    # gráfico de Energia Diária por data saíram porque a coluna de período virou
-    # texto, faixa início–fim, igual ao site.)
+    # Resumo: barras (comparativo, topo direito). Gráficos: linha (perfil) +
+    # 2 barras (energia diária e média). Dados: linha ao longo do tempo.
     assert tipos == [
         ("Resumo", "BarChart"),
+        ("Gráficos", "LineChart"),
+        ("Gráficos", "BarChart"),
+        ("Gráficos", "BarChart"),
         ("Dados", "LineChart"),
     ]
 
@@ -137,19 +157,19 @@ def test_duas_fontes_kt_fora_das_estatisticas(tmp_path):
     exporta(_df_duas_fontes(), _metadados(), caminho)
 
     wb = load_workbook(caminho)
-    assert wb.sheetnames == ["Resumo", "Dados"]  # nunca há aba Comparação
+    assert wb.sheetnames == ["Resumo", "Gráficos", "Dados"]
 
-    # kt entra na TabDados (sem unidade), mas não nas estatísticas.
     tab = wb["Dados"].tables["TabDados"]
     nomes = [c.name for c in tab.tableColumns]
     assert "kt" in nomes
     assert "GHI_McClear (W/m²)" in nomes
 
+    # Estatísticas (A16 cabeçalho; A17+ componentes); kt não entra.
     r = wb["Resumo"]
     componentes = []
-    i = 4
-    while r.cell(row=i, column=7).value:  # enquanto houver fórmula de Média
-        componentes.append(r.cell(row=i, column=6).value)
+    i = 17
+    while r.cell(row=i, column=2).value:  # enquanto houver fórmula de Média (col B)
+        componentes.append(r.cell(row=i, column=1).value)
         i += 1
     assert componentes == ["GHI_McClear", "GHI_NASA"]
     assert "kt" not in componentes
@@ -192,8 +212,9 @@ def test_abas_qualidade_e_reprodutibilidade(tmp_path):
     exporta(df, _metadados(), caminho, relatorio_qc=qc, reprodutibilidade=repro)
 
     wb = load_workbook(caminho)
-    assert wb.sheetnames == ["Resumo", "Dados", "Qualidade", "Reprodutibilidade"]
-    # Conteúdos-chave presentes.
+    assert wb.sheetnames == [
+        "Resumo", "Gráficos", "Dados", "Qualidade", "Reprodutibilidade",
+    ]
     q_txt = " ".join(
         str(c.value) for row in wb["Qualidade"].iter_rows()
         for c in row if c.value is not None
@@ -209,15 +230,12 @@ def test_abas_qualidade_e_reprodutibilidade(tmp_path):
 
 
 def test_dados_exibidos_com_4_casas_sem_arredondar(tmp_path):
-    """Os valores de radiação devem ser exibidos com 4 casas (precisão da fonte),
-    não arredondados para 1 casa; o valor guardado é o float completo."""
+    """Valores de radiação exibidos com 4 casas (precisão da fonte), não 1."""
     caminho = tmp_path / "saida_fmt.xlsx"
     exporta(_df_uma_fonte(), _metadados(), caminho)
     wb = load_workbook(caminho)
-    ws = wb["Dados"]
-    assert ws["B2"].number_format == "0.0000"   # célula de dado (GHI)
-    # A estatística (Média do GHI no Resumo) também usa 4 casas.
-    assert wb["Resumo"]["G4"].number_format == "0.0000"
+    assert wb["Dados"]["B2"].number_format == "0.0000"   # célula de dado (GHI)
+    assert wb["Resumo"]["B17"].number_format == "0.0000"  # Média do 1º componente
 
 
 def test_passo_diario_usa_unidade_wh(tmp_path):
@@ -228,4 +246,4 @@ def test_passo_diario_usa_unidade_wh(tmp_path):
 
     wb = load_workbook(caminho)
     assert wb["Dados"]["B1"].value == "GHI (Wh/m²)"
-    assert wb["Resumo"]["L4"].value == "=K4/10/1000"  # 10 dias
+    assert wb["Resumo"]["G17"].value == "=F17/10/1000"  # 10 dias
