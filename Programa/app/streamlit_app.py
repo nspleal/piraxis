@@ -31,7 +31,6 @@ Execute com:  streamlit run app/streamlit_app.py
 
 from __future__ import annotations
 
-import base64
 import logging
 import sys
 from datetime import date, timedelta
@@ -67,9 +66,11 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 
+# Favicon = símbolo PIRAXIS (pyranômetro + arco zenital). Cai para ☀️ se faltar.
+_FAVICON = Path(__file__).resolve().parent / "assets" / "piraxis-icon.png"
 st.set_page_config(
     page_title="PIRAXIS — UNESP",
-    page_icon="☀️",
+    page_icon=str(_FAVICON) if _FAVICON.exists() else "☀️",
     layout="wide",
 )
 
@@ -92,7 +93,20 @@ VERMELHO = "#C9776B"    # alerta
 BORDA = "rgba(255,255,255,0.07)"
 
 ASSETS_DIR = Path(__file__).resolve().parent / "assets"
-LOGO_DARK = ASSETS_DIR / "unesp-horizontal-dark.png"
+
+# Símbolo PIRAXIS (piranômetro + arco zenital) embutido inline no cabeçalho —
+# vetorial, sempre nítido. Mesma geometria do ícone/favicon (assets/).
+LOGO_SVG = (
+    "<svg width='34' height='34' viewBox='0 0 56 56' fill='none' "
+    "xmlns='http://www.w3.org/2000/svg' style='display:block'>"
+    "<circle cx='28' cy='28' r='22' fill='none' stroke='#4A7AA8' stroke-width='2'/>"
+    "<circle cx='28' cy='28' r='13' fill='none' stroke='#4A7AA8' stroke-width='1.5'/>"
+    "<line x1='5' y1='28' x2='51' y2='28' stroke='#34618F' stroke-width='0.75'/>"
+    "<line x1='28' y1='6' x2='28' y2='25' stroke='#4A7AA8' stroke-width='1.5' "
+    "stroke-dasharray='2.5,1.8'/>"
+    "<circle cx='28' cy='6' r='4.5' fill='#E0A050'/>"
+    "<circle cx='28' cy='28' r='3' fill='#E0A050'/></svg>"
+)
 
 # Ordem em que os cards de métrica aparecem no Painel (componentes da superfície
 # primeiro; TOA por último — é o teto teórico).
@@ -258,13 +272,6 @@ def _fmt_num(valor: float | None, casas: int = 0) -> str:
         return "—"
     s = f"{valor:,.{casas}f}"
     return s.replace(",", "X").replace(".", ",").replace("X", ".")
-
-
-def _logo_b64() -> str | None:
-    """Logo da UNESP (variante escura) embutido como data URI, se existir."""
-    if LOGO_DARK.exists():
-        return base64.b64encode(LOGO_DARK.read_bytes()).decode("ascii")
-    return None
 
 
 def _serie(df: pd.DataFrame, comp: str) -> pd.Series | None:
@@ -585,19 +592,10 @@ with st.sidebar:
 # Cabeçalho institucional (usa os valores da barra lateral)
 # ---------------------------------------------------------------------------
 def _cabecalho() -> None:
-    logo = _logo_b64()
-    if logo:
-        logo_html = (
-            f"<img src='data:image/png;base64,{logo}' alt='UNESP' "
-            "style='height:26px;width:auto;display:block'/>"
-            f"<div style='width:0.5px;height:30px;background:rgba(255,255,255,0.12)'></div>"
-        )
-    else:
-        logo_html = (
-            f"<div style='font-family:Space Grotesk,sans-serif;font-weight:500;"
-            f"font-size:20px;color:{TXT2}'>unesp</div>"
-            f"<div style='width:0.5px;height:30px;background:rgba(255,255,255,0.12)'></div>"
-        )
+    logo_html = (
+        f"{LOGO_SVG}"
+        "<div style='width:0.5px;height:30px;background:rgba(255,255,255,0.12)'></div>"
+    )
     if data_inicio == data_fim:
         kind, valor = "Dia", f"{data_inicio:%d/%m/%Y}"
     else:
@@ -606,8 +604,8 @@ def _cabecalho() -> None:
         "<div class='rad-header'>"
         "<div class='rad-header-left'>"
         f"{logo_html}"
-        "<div><div class='rad-title' style='letter-spacing:3px'>PIRAXIS</div>"
-        f"<div class='rad-subtitle'>extrator de radiação solar · {nome_local}</div></div>"
+        "<div><div class='rad-title' style='letter-spacing:4px;font-weight:500'>PIRAXIS</div>"
+        "<div class='rad-subtitle'>extrator de radiação solar · UNESP / FCA Botucatu</div></div>"
         "</div>"
         "<div style='display:flex;align-items:center'>"
         f"<span class='rad-pill'><span class='rad-dot' style='background:{AMBAR}'></span>"
