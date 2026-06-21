@@ -28,7 +28,10 @@ Projeto acadêmico da UNESP; local padrão **Botucatu/SP** (−22.8867, −48.44
   barra lateral de configuração; cards, cascata de atenuação, fechamento, gráficos Plotly, QC, downloads.
 - `app/assets/` — logos UNESP (variante escura `unesp-horizontal-dark.png`) + `.streamlit/config.toml` (tema escuro).
 - `tests/` — `pytest` (mockado, sem rede) + scripts `validar_*.py` (suíte de validação).
-- `INICIAR PIRAXIS.bat` / `Programa/INICIAR PIRAXIS (Mac e Linux).command` — launchers.
+- `INICIAR PIRAXIS.bat` / `Programa/INICIAR PIRAXIS (Mac e Linux).command` — launchers (venv-based, dev).
+- `empacotar.py` (raiz) — build do **pacote portátil** (Python embutido via python-build-standalone);
+  saída em `dist/`. Camada de código no pacote: `Programa/atualizar.py` (updater leve, no-op por padrão),
+  `Programa/requirements.lock` (pins), `Programa/LEIA-ME.txt` (instruções do usuário final).
 
 ## 3. Como rodar e testar
 - **Rodar:** dois cliques no `INICIAR PIRAXIS.bat` (cria `.venv`, instala, abre o app).
@@ -36,6 +39,9 @@ Projeto acadêmico da UNESP; local padrão **Botucatu/SP** (−22.8867, −48.44
 - **Testes unitários:** dentro de `Programa/` → `python -m pytest` (sem rede).
 - **Validação completa:** `python tests/rodar_validacao_completa.py` (lê o e-mail SoDa de
   `~/.radiacao_solar/config.json` > `SODA_EMAIL` > `--email`; itens de API ficam PULADOS sem e-mail).
+- **Empacotar (pacote portátil, sem exigir Python):** na máquina do SO alvo → `python empacotar.py`
+  (padrão Windows; `--alvo linux-x64`/`macos-arm64`/`macos-x64`; `--locked` p/ rebuild reprodutível).
+  Faz build + validação e gera `dist/PIRAXIS/` + zips. ⚠️ Cada SO se empacota nele mesmo.
 
 ## 4. Estado e KNOWN ISSUES (desta sessão; podem não estar no código)
 - **✅ NOME OFICIAL: PIRAXIS (travado 2026-06-21):** o projeto chama-se **PIRAXIS** (grafia com **I**,
@@ -52,6 +58,19 @@ Projeto acadêmico da UNESP; local padrão **Botucatu/SP** (−22.8867, −48.44
   (logo híbrida piranômetro+arco): `app/assets/piraxis-symbol.svg` (vetorial, inline no cabeçalho) +
   `app/assets/piraxis-icon.png` (favicon, fundo `#14181F` arredondado). Cabeçalho = símbolo + wordmark
   **PIRAXIS** + subtítulo "extrator de radiação solar · UNESP / FCA Botucatu"; aba do navegador = símbolo.
+- **✅ PACOTE PORTÁTIL (runtime embutido) — 2026-06-21:** `empacotar.py` gera um pacote autocontido
+  (CPython **3.12.11** / PBS **20250612**, `install_only`, relocável) com as dependências instaladas
+  dentro — **duplo clique, sem instalar Python**, offline no 1º uso. Modelo de **2 camadas** (runtime
+  pinado + código leve); `Programa/atualizar.py` atualiza **só código** com **trava de dependências**
+  (`URL_ATUALIZACAO` vazio = no-op; sem token; nunca toca `python/`/`cache/`/`data/`/`.env`/
+  `~/.radiacao_solar/`). `requirements.txt` é a fonte única → build congela `requirements.lock`.
+  Validado no alvo **linux-x64**: SHA256 OK, `pip check` OK, **pytest 47/47 no Python 3.12.11 embutido**,
+  boot headless 200, AC1/AC2/AC5/AC6/AC7 OK. ⚠️ **Windows tem de ser empacotado no Windows** (não dá p/
+  rodar `python.exe` a partir do Linux). **A confirmar (constantes):** versão do Python embutido e o
+  **canal de update** — repo é **privado**, então p/ ligar auto-update é preciso publicar o
+  `PIRAXIS-codigo-<versao>.zip` num local **público** (sem embutir token). `dist/`, `*.zip`, `VERSAO.txt`
+  e `.empacotar_cache/` são gitignored; `empacotar.py`/`atualizar.py`/`requirements.lock`/`LEIA-ME.txt`
+  são versionados.
 - **🎯 PRINCÍPIO DE FIDELIDADE (travado 2026-06-21):** toda extração deve sair **idêntica à sua
   fonte** — CAMS McClear no formato do CAMS; NASA POWER no formato da NASA. Hoje o Excel está fiel ao
   **CAMS** (período em faixa início–fim UTC, altitude do ponto, 4 casas decimais). ⚠️ **Ao trabalhar a
