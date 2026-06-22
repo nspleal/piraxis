@@ -1,34 +1,53 @@
 #!/usr/bin/env bash
 # ===========================================================================
 #  PIRAXIS — extrator de radiação solar (UNESP)
-#  Dê DOIS CLIQUES neste arquivo para abrir o programa (Mac e Linux).
+#  Launcher de DESENVOLVIMENTO (para máquinas que TÊM Python).
 #
-#  Na PRIMEIRA vez ele instala tudo (demora alguns minutos, é normal).
-#  Depois abre sozinho no navegador. Para fechar, feche esta janela.
+#  >>> Máquina SEM Python? Use o PACOTE PORTÁTIL do PIRAXIS (gerado por
+#      empacotar.py): já vem com Python embutido e não precisa instalar nada.
+#
+#  Dê DOIS CLIQUES neste arquivo para abrir o programa (Mac e Linux).
+#  Na PRIMEIRA vez ele prepara tudo (demora alguns minutos, é normal).
 # ===========================================================================
-set -e
 cd "$(dirname "$0")"
 
-# Garante que o Python existe.
-if ! command -v python3 >/dev/null 2>&1; then
+# Cria o ambiente virtual na primeira vez (usa o Python do sistema).
+if [ ! -x ".venv/bin/python" ]; then
+  if ! command -v python3 >/dev/null 2>&1; then
+    echo ""
+    echo "[ERRO] O Python 3 não foi encontrado nesta máquina."
+    echo " - Para usar ESTE atalho, instale o Python 3.11+ em"
+    echo "   https://www.python.org/downloads/ e tente de novo; ou"
+    echo " - use o PACOTE PORTÁTIL do PIRAXIS (não precisa de Python)."
+    echo ""
+    read -r -p "Pressione ENTER para sair..." _
+    exit 1
+  fi
+  echo "Preparando o programa pela primeira vez. Isso pode demorar alguns minutos..."
+  python3 -m venv .venv
+fi
+
+# Daqui em diante usamos SEMPRE o Python do próprio ambiente (.venv), sem
+# depender de PATH -- evita o erro "streamlit: command not found".
+PY="./.venv/bin/python"
+if [ ! -x "$PY" ]; then
   echo ""
-  echo "[ERRO] O Python 3 não foi encontrado."
-  echo "Instale o Python 3.11+ em https://www.python.org/downloads/ e tente de novo."
+  echo "[ERRO] Não consegui preparar o ambiente (.venv). Instale o Python 3.11+"
+  echo "ou use o PACOTE PORTÁTIL do PIRAXIS."
   echo ""
   read -r -p "Pressione ENTER para sair..." _
   exit 1
 fi
 
-# Cria o ambiente virtual e instala as dependências na primeira vez.
-if [ ! -d ".venv" ]; then
-  echo "Preparando o programa pela primeira vez. Isso pode demorar alguns minutos..."
-  python3 -m venv .venv
-  ./.venv/bin/python -m pip install --upgrade pip
-  ./.venv/bin/pip install -r requirements.txt
+# Garante as dependências (instala se o streamlit ainda não estiver presente).
+if ! "$PY" -m pip show streamlit >/dev/null 2>&1; then
+  echo "Instalando as bibliotecas necessárias (só na primeira vez)..."
+  "$PY" -m pip install --upgrade pip
+  "$PY" -m pip install -r requirements.txt
 fi
 
 echo ""
 echo "Abrindo o aplicativo no seu navegador..."
 echo "(Para encerrar o programa, feche esta janela.)"
 echo ""
-./.venv/bin/streamlit run app/streamlit_app.py
+"$PY" -m streamlit run app/streamlit_app.py
