@@ -1,0 +1,45 @@
+name: Empacotar PIRAXIS (Windows portátil)
+
+# Gera o PACOTE PORTÁTIL de Windows (Python embutido) numa máquina Windows da
+# própria GitHub e publica o .zip como ARTEFATO para download — assim ninguém
+# precisa instalar Python para gerar nem para rodar o programa.
+#
+# Como usar (pelo navegador, sem terminal):
+#   1. Abra a aba "Actions" do repositório no GitHub.
+#   2. Escolha "Empacotar PIRAXIS (Windows portátil)" na lista à esquerda.
+#   3. Clique em "Run workflow" (botão à direita) e confirme.
+#   4. Quando terminar (uns minutos), abra a execução e baixe o artefato
+#      "PIRAXIS-windows-x64" (um .zip). Descompacte e dê dois cliques em
+#      INICIAR PIRAXIS.bat — não precisa de Python na máquina de destino.
+
+on:
+  workflow_dispatch:        # disparo manual pelo botão "Run workflow"
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Baixar o código do repositório
+        uses: actions/checkout@v4
+
+      - name: Preparar um Python para RODAR o build (só na nuvem)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Gerar o pacote portátil (Windows x64) + validar
+        run: python empacotar.py --alvo windows-x64
+
+      - name: Publicar o pacote para download
+        uses: actions/upload-artifact@v4
+        with:
+          name: PIRAXIS-windows-x64
+          path: |
+            dist/PIRAXIS-*-windows-x64.zip
+            dist/PIRAXIS-codigo-*.zip
+            dist/manifesto.json
+          if-no-files-found: error
+          retention-days: 90
