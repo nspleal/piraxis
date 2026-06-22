@@ -78,6 +78,15 @@ Projeto acadêmico da UNESP; local padrão **Botucatu/SP** (−22.8867, −48.44
   segredos (PBS público + PyPI; GITHUB_TOKEN só p/ checkout). **Decisão do pesquisador (2026-06-22): a
   versão COMPLETA (autocontida, sem Python) é a versão BASE** — o artefato sobe **só o pacote completo**
   (a pasta `dist/PIRAXIS`, camada única), sem o zip só-código nem o `manifesto.json`.
+- **✅ MODELO DE DISTRIBUIÇÃO (decisão do pesquisador, 2026-06-22):** o **desenvolvimento** do dia a dia
+  é no **código-fonte** (versão leve, **sem** o Python embutido — mais rápida de editar/testar). O **pacote
+  com Python embutido** fica **guardado de forma permanente** numa **GitHub Release rolante** chamada
+  **`pacote-windows`** (não expira; link fixo `…/releases/download/pacote-windows/PIRAXIS-windows-x64.zip`),
+  para testes no laboratório. **Atualizar = re-rodar o workflow** (Actions → Run workflow): cada execução
+  **recria** a Release apontando para o commit atual (apaga+cria a tag), então o link é sempre o mesmo e
+  sempre fresco. O workflow ainda anexa o pacote como **artefato** (cópia da build, expira em 90 dias),
+  mas o lugar canônico de download é a **Release**. ⚠️ Em repo **privado**, baixar o asset exige estar
+  **logado no GitHub** (o pesquisador é o dono — ok).
 - **✅ BUG "No module named 'urllib'" no Windows — RESOLVIDO (confirmado em campo) — CAUSA: caminho longo (MAX_PATH 260) — 2026-06-22:**
   o runtime PBS é íntegro (`urllib` presente, sem `._pth`/`pythonXX.zip`; stdlib achado pelo landmark
   `Lib/os.py`) e a validação na nuvem passou (boot importa `urllib`). O erro só aparecia na máquina do
