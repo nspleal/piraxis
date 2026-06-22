@@ -71,6 +71,22 @@ Projeto acadêmico da UNESP; local padrão **Botucatu/SP** (−22.8867, −48.44
   `PIRAXIS-codigo-<versao>.zip` num local **público** (sem embutir token). `dist/`, `*.zip`, `VERSAO.txt`
   e `.empacotar_cache/` são gitignored; `empacotar.py`/`atualizar.py`/`requirements.lock`/`LEIA-ME.txt`
   são versionados.
+- **✅ BUILD DE WINDOWS NA NUVEM (GitHub Actions) — 2026-06-22:** `.github/workflows/empacotar-windows.yml`
+  roda `empacotar.py --alvo windows-x64` num runner **windows-latest** (disparo manual "Run workflow"),
+  **valida em Windows real** (pip check, pytest, boot 200) e publica o pacote como **artefato p/ download**.
+  Resolve o impasse "ninguém quer instalar Python": o build é na nuvem, a máquina-destino só roda. Sem
+  segredos (PBS público + PyPI; GITHUB_TOKEN só p/ checkout). **Decisão do pesquisador (2026-06-22): a
+  versão COMPLETA (autocontida, sem Python) é a versão BASE** — o artefato sobe **só o pacote completo**
+  (a pasta `dist/PIRAXIS`, camada única), sem o zip só-código nem o `manifesto.json`.
+- **🐛 BUG "No module named 'urllib'" no Windows — CAUSA: caminho longo (MAX_PATH 260) — 2026-06-22:**
+  o runtime PBS é íntegro (`urllib` presente, sem `._pth`/`pythonXX.zip`; stdlib achado pelo landmark
+  `Lib/os.py`) e a validação na nuvem passou (boot importa `urllib`). O erro só aparecia na máquina do
+  pesquisador porque o **zip-dentro-de-zip** (artefato → zip interno → pasta) + caminho fundo/com espaço
+  estourava o limite de **260 caracteres** do Windows, e o **descompactador do Explorer PULA arquivos sem
+  avisar** → `Lib/` parcial (faltou `urllib`) enquanto `site-packages` (mais fundo) existia → `Lib` fora
+  do `sys.path`. **Fix:** (1) artefato vira **camada única** (some o zip interno → menos um nível);
+  (2) `LEIA-ME.txt` manda **descompactar em caminho CURTO** (ex.: `C:\PIRAXIS`). ⚠️ Não inspecionei o
+  artefato real aqui: o storage do artefato (Azure blob) **não está no allowlist de egress** desta nuvem.
 - **🎯 PRINCÍPIO DE FIDELIDADE (travado 2026-06-21):** toda extração deve sair **idêntica à sua
   fonte** — CAMS McClear no formato do CAMS; NASA POWER no formato da NASA. Hoje o Excel está fiel ao
   **CAMS** (período em faixa início–fim UTC, altitude do ponto, 4 casas decimais). ⚠️ **Ao trabalhar a

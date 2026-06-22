@@ -10,13 +10,24 @@ uso e não precisa de permissão de administrador.
 --------------------------------------------------------------
 PASSO A PASSO
 --------------------------------------------------------------
-1. DESCOMPACTE o arquivo .zip em uma pasta SUA, onde você tenha
-   permissão para gravar — por exemplo a Área de Trabalho
-   (Desktop) ou Documentos.
+1. DESCOMPACTE o arquivo .zip.
 
-   IMPORTANTE: NÃO coloque em "Arquivos de Programas" /
-   "Program Files". O programa cria as pastas "cache" e "data"
-   dentro da própria pasta dele e precisa poder escrever ali.
+   >>> MUITO IMPORTANTE: descompacte em um caminho CURTO, perto
+   >>> da raiz do disco — por exemplo  C:\PIRAXIS
+   >>>
+   >>> NÃO descompacte direto na Área de Trabalho dentro de
+   >>> pastas com nomes longos. O Windows tem um limite de 260
+   >>> caracteres no caminho dos arquivos; se o caminho ficar
+   >>> longo, o descompactador do Windows PULA arquivos SEM
+   >>> AVISAR e o programa falha ao abrir (ex.: erro
+   >>> "No module named 'urllib'"). Caminho curto resolve.
+
+   Como descompactar (Windows): clique com o botão direito no
+   .zip > "Extrair tudo..." e troque o destino para  C:\PIRAXIS
+
+   NÃO coloque em "Arquivos de Programas" / "Program Files":
+   o programa cria as pastas "cache" e "data" dentro da própria
+   pasta dele e precisa poder escrever ali.
 
 2. Dê DOIS CLIQUES no ícone de início:
    - Windows:    INICIAR PIRAXIS.bat
