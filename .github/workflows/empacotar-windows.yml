@@ -9,8 +9,14 @@ name: Empacotar PIRAXIS (Windows portátil)
 #   2. Escolha "Empacotar PIRAXIS (Windows portátil)" na lista à esquerda.
 #   3. Clique em "Run workflow" (botão à direita) e confirme.
 #   4. Quando terminar (uns minutos), abra a execução e baixe o artefato
-#      "PIRAXIS-windows-x64" (um .zip). Descompacte e dê dois cliques em
-#      INICIAR PIRAXIS.bat — não precisa de Python na máquina de destino.
+#      "PIRAXIS-windows-x64" (um .zip). Descompacte em um caminho CURTO
+#      (ex.: C:\PIRAXIS) e dê dois cliques em INICIAR PIRAXIS.bat — não
+#      precisa de Python na máquina de destino.
+#
+# O artefato contém o PACOTE COMPLETO (Python embutido + bibliotecas + app)
+# como UMA camada só — sem zip-dentro-de-zip. Assim o usuário descompacta
+# UMA vez, o caminho fica mais curto e não esbarra no limite de 260
+# caracteres do Windows (que fazia o descompactador pular arquivos).
 
 on:
   workflow_dispatch:        # disparo manual pelo botão "Run workflow"
@@ -33,13 +39,13 @@ jobs:
       - name: Gerar o pacote portátil (Windows x64) + validar
         run: python empacotar.py --alvo windows-x64
 
-      - name: Publicar o pacote para download
+      - name: Publicar o pacote COMPLETO para download (camada única)
         uses: actions/upload-artifact@v4
         with:
           name: PIRAXIS-windows-x64
-          path: |
-            dist/PIRAXIS-*-windows-x64.zip
-            dist/PIRAXIS-codigo-*.zip
-            dist/manifesto.json
+          # Sobe a PASTA do pacote (não o .zip interno) -> o download já é
+          # o pacote completo, descompactado UMA vez só. Sem zip-de-zip.
+          path: dist/PIRAXIS
           if-no-files-found: error
           retention-days: 90
+          compression-level: 6
