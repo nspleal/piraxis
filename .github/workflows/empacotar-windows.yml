@@ -1,28 +1,32 @@
 name: Empacotar PIRAXIS (Windows portátil)
 
 # Gera o PACOTE PORTÁTIL de Windows (Python embutido) numa máquina Windows da
-# própria GitHub e publica o .zip como ARTEFATO para download — assim ninguém
-# precisa instalar Python para gerar nem para rodar o programa.
+# própria GitHub. Ninguém precisa instalar Python — nem para gerar, nem para
+# rodar. O resultado fica guardado em DOIS lugares:
 #
-# Como usar (pelo navegador, sem terminal):
-#   1. Abra a aba "Actions" do repositório no GitHub.
-#   2. Escolha "Empacotar PIRAXIS (Windows portátil)" na lista à esquerda.
-#   3. Clique em "Run workflow" (botão à direita) e confirme.
-#   4. Quando terminar (uns minutos), abra a execução e baixe o artefato
-#      "PIRAXIS-windows-x64" (um .zip). Descompacte em um caminho CURTO
-#      (ex.: C:\PIRAXIS) e dê dois cliques em INICIAR PIRAXIS.bat — não
-#      precisa de Python na máquina de destino.
+#   1. RELEASE "pacote-windows" (PERMANENTE, link fixo, NÃO expira)  <-- use este
+#      Página: .../releases/tag/pacote-windows
+#      Download direto: .../releases/download/pacote-windows/PIRAXIS-windows-x64.zip
+#      É a "cópia para sempre": cada execução do workflow ATUALIZA esta Release.
 #
-# O artefato contém o PACOTE COMPLETO (Python embutido + bibliotecas + app)
-# como UMA camada só — sem zip-dentro-de-zip. Assim o usuário descompacta
-# UMA vez, o caminho fica mais curto e não esbarra no limite de 260
-# caracteres do Windows (que fazia o descompactador pular arquivos).
+#   2. ARTEFATO "PIRAXIS-windows-x64" (temporário, expira em 90 dias)
+#      Anexado à execução, útil como cópia da build específica.
+#
+# Como ATUALIZAR (para um novo teste no laboratório), pelo navegador:
+#   1. Aba "Actions" -> "Empacotar PIRAXIS (Windows portátil)".
+#   2. "Run workflow" -> confirmar. Em uns minutos a Release "pacote-windows"
+#      já aponta para a versão nova (mesmo link de sempre).
+#
+# Como USAR na máquina de destino (sem Python):
+#   Baixe PIRAXIS-windows-x64.zip, extraia em um caminho CURTO (ex.: C:\PIRAXIS)
+#   e dê dois cliques em INICIAR PIRAXIS.bat. O caminho curto evita o limite de
+#   260 caracteres do Windows (que faz o descompactador pular arquivos).
 
 on:
   workflow_dispatch:        # disparo manual pelo botão "Run workflow"
 
 permissions:
-  contents: read
+  contents: write           # necessário para publicar/atualizar a Release
 
 jobs:
   build-windows:
@@ -39,12 +43,36 @@ jobs:
       - name: Gerar o pacote portátil (Windows x64) + validar
         run: python empacotar.py --alvo windows-x64
 
-      - name: Publicar o pacote COMPLETO para download (camada única)
+      - name: Guardar/atualizar a Release PERMANENTE "pacote-windows"
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Asset com nome ESTÁVEL (link sempre igual), a partir do zip completo do build.
+          ZIP_BUILD="$(ls dist/PIRAXIS-*-windows-x64.zip | head -n1)"
+          cp "$ZIP_BUILD" "dist/PIRAXIS-windows-x64.zip"
+
+          SHA_SHORT="${GITHUB_SHA::7}"
+          printf '%s\n\n%s\n\n%s\n' \
+            "Pacote portátil do PIRAXIS para Windows — Python embutido, NÃO precisa instalar nada." \
+            "Build automático do commit ${SHA_SHORT}." \
+            "Como usar: baixe PIRAXIS-windows-x64.zip, extraia em um caminho CURTO (exemplo: C:\\PIRAXIS) e dê dois cliques em INICIAR PIRAXIS.bat." \
+            > dist/release-notes.md
+
+          # Release ROLANTE: apaga a anterior (+ tag) e recria apontando para o commit atual.
+          gh release delete pacote-windows --yes --cleanup-tag 2>/dev/null || true
+          gh release create pacote-windows "dist/PIRAXIS-windows-x64.zip" \
+            --title "PIRAXIS — pacote Windows (mais recente)" \
+            --notes-file dist/release-notes.md \
+            --latest \
+            --target "$GITHUB_SHA"
+
+      - name: Anexar o pacote COMPLETO também como artefato (cópia da build)
         uses: actions/upload-artifact@v4
         with:
           name: PIRAXIS-windows-x64
-          # Sobe a PASTA do pacote (não o .zip interno) -> o download já é
-          # o pacote completo, descompactado UMA vez só. Sem zip-de-zip.
+          # Sobe a PASTA do pacote (não o .zip interno) -> download em camada única.
           path: dist/PIRAXIS
           if-no-files-found: error
           retention-days: 90
