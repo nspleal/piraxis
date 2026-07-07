@@ -225,13 +225,19 @@ def test_extracao_combinada_usa_so_colunas_mcclear():
     assert rel.por_componente["GHI"]["max_abs"] == 0.0
 
 
-def test_espurio_sobre_referencia_zero_nao_e_identico():
-    """Regressão (auditoria 2026-06-22): valor espúrio onde o site marca 0
-    (noite) passava como "Idêntico" — o desvio relativo indefinido virava 0.
-    Agora conta como fora de tolerância."""
+def test_espurio_sobre_referencia_zero_e_relevante():
+    """Regressão (auditorias 2026-06-22 e 2026-07-07): valor espúrio onde o
+    site marca 0 (noite) passava como "Idêntico"; corrigido, ainda ficava
+    capado em "Diferenças pequenas" (o relativo indefinido não entra no
+    max_rel). Dado "fabricado" sobre zero é o pior desvio de fidelidade:
+    conta à parte (n_ref_zero_fora) e classifica direto como RELEVANTE."""
     ex, ref = _ex(), _ex()
     ref.loc[0, "GHI"] = 0.0   # site: noite
     ex.loc[0, "GHI"] = 3.0    # extração: 3 Wh/m² espúrios (> tol_abs)
     rel = comparar(ex, ref)
     assert rel.por_componente["GHI"]["n_fora_tol"] >= 1
-    assert rel.status != "Idêntico"
+    assert rel.por_componente["GHI"]["n_ref_zero_fora"] == 1
+    assert rel.status == "Diferenças relevantes"
+    # O relatório explica o ponto (nada de "máx rel 0,00%" sem contexto).
+    assert "site marca 0" in rel.resumo_texto
+    assert "site marca 0" in formatar_relatorio_md(rel)

@@ -79,8 +79,8 @@ def _checar_excel(email: str) -> tuple[bool, str]:
 
         problemas: list[str] = []
         wb = load_workbook(caminho)
-        # Modelo oficial (Resumo, Dados) + abas de QC e reprodutibilidade.
-        esperadas = ["Resumo", "Dados", "Qualidade", "Reprodutibilidade"]
+        # Modelo oficial (Resumo, Gráficos, Dados) + abas de QC e reprodutibilidade.
+        esperadas = ["Resumo", "Gráficos", "Dados", "Qualidade", "Reprodutibilidade"]
         if wb.sheetnames != esperadas:
             problemas.append(f"abas={wb.sheetnames} (esperado {esperadas})")
 

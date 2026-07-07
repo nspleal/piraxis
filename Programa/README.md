@@ -96,15 +96,18 @@ e-mail salvo na máquina. Para gravar como padrão da máquina, use o botão
 ## A planilha gerada
 
 O arquivo `PIRAXIS_<local>_<inicio>_<fim>.xlsx` é salvo na pasta `data/` e segue
-o **modelo oficial do projeto** (planilha_modelo_para_IC), com duas abas:
+o **modelo oficial do projeto** (planilha_modelo_para_IC), com três abas:
 
 - **Resumo** — título, informações gerais do estudo e a tabela "Estatísticas de
   Radiação" (Média, Média Diurna, Máximo, Mínimo Diurno, Energia e kWh/m²/dia),
   tudo calculado com **fórmulas do Excel**, mais um **gráfico comparativo** por
   componente.
+- **Gráficos** — a tabela de **Energia Diária** por dia, a energia média diária
+  por componente e três gráficos (perfil temporal, energia diária e energia
+  média), tudo com **fórmulas do Excel** sobre a tabela de dados.
 - **Dados** — a série temporal completa numa **tabela do Excel** chamada
-  `TabDados` (filtros automáticos e listras), uma tabela de **Energia Diária**
-  e dois gráficos: radiação ao longo do tempo e energia por dia.
+  `TabDados` (filtros automáticos e listras), com o período de cada valor em
+  faixa início–fim (UTC).
 
 Na extração **combinada** (duas fontes), as colunas aparecem com o sufixo da
 fonte (ex.: `GHI_McClear`, `GHI_NASA`) e o índice de claridade `kt` entra como
@@ -200,8 +203,11 @@ basta criar um arquivo em `sources/` com uma classe que herde de `FonteRadiacao`
 ## Rodando os testes (desenvolvedores)
 
 ```bash
-pip install -r requirements.txt   # inclui pytest e responses
+pip install -r requirements.txt -r requirements-dev.txt
 pytest
 ```
+
+(`requirements.txt` tem só as dependências de produção — é o que vai no pacote
+portátil; `requirements-dev.txt` acrescenta pytest e responses para os testes.)
 
 Os testes **não fazem rede real** — as APIs são simuladas.
