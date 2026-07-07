@@ -104,7 +104,7 @@ def _info_fontes(fontes: list[str]) -> list[dict]:
             "servico": "NASA Langley Research Center — POWER Project",
             "endpoint": "power.larc.nasa.gov",
             "identifier": None,
-            "atraso_dados": "alguns dias",
+            "atraso_dados": "~2 dias",
         })
     return info
 
@@ -139,7 +139,15 @@ def montar_proveniencia(
             "nome": local.nome,
             "latitude": local.latitude,
             "longitude": local.longitude,
-            "altitude_m": local.altitude,
+            # Altitude ≤ 0 é o sentinela "não informada": o serviço SoDa
+            # estima por SRTM. Não gravar -999 como se fosse altitude real.
+            "altitude_m": (
+                local.altitude if _altitude_informada(local) else None
+            ),
+            "altitude_origem": (
+                "informada pelo usuário" if _altitude_informada(local)
+                else "estimada pelo serviço SoDa (base SRTM) — não informada"
+            ),
         },
         "periodo": {
             "inicio": str(data_inicio),
@@ -177,18 +185,37 @@ def _fmt(valor: float, casas: int, virgula: bool) -> str:
     return s.replace(".", ",") if virgula else s
 
 
+def _altitude_informada(local) -> bool:
+    """True quando o usuário informou uma altitude válida (> 0).
+
+    Altitude ≤ 0 (incl. o sentinela -999) significa "não informada": o cliente
+    CAMS envia altitude=None e o serviço SoDa estima pela base SRTM.
+    """
+    return bool(local.altitude and local.altitude > 0)
+
+
 def gerar_metodologia(
     local, data_inicio: date, data_fim: date, passo_rotulo: str, fontes: list[str]
 ) -> tuple[str, str]:
-    """Gera os parágrafos de metodologia em português e inglês."""
+    """Gera os parágrafos de metodologia em português e inglês.
+
+    Sem país fixado no texto (o app aceita qualquer lat/lon) e sem vazar o
+    sentinela de altitude (-999): quando a altitude não foi informada, o texto
+    diz — corretamente — que ela foi estimada pela base SRTM do serviço.
+    """
     usou_mcclear = _usou(fontes, "mcclear") or _usou(fontes, "cams")
     usou_nasa = _usou(fontes, "nasa") or _usou(fontes, "power")
+    alt_ok = _altitude_informada(local)
 
     # ----- Português -----
+    alt_pt = (
+        f", altitude {_fmt(local.altitude, 0, True)} m" if alt_ok
+        else ", com altitude estimada pela base SRTM do serviço SoDa"
+    )
     pt = (
-        f"Os dados de radiação solar foram obtidos para o município de "
+        f"Os dados de radiação solar foram obtidos para a localidade de "
         f"{local.nome} (latitude {_fmt(local.latitude, 4, True)}°, longitude "
-        f"{_fmt(local.longitude, 4, True)}°, altitude {_fmt(local.altitude, 0, True)} m), "
+        f"{_fmt(local.longitude, 4, True)}°{alt_pt}), "
         f"no período de {data_inicio:%d/%m/%Y} a {data_fim:%d/%m/%Y}, com "
         f"resolução temporal de {passo_rotulo}. "
     )
@@ -196,8 +223,13 @@ def gerar_metodologia(
         pt += (
             "A irradiância em condições de céu limpo foi estimada pelo modelo "
             "CAMS McClear (Lefèvre et al., 2013; Gschwind et al., 2019), "
-            "acessado via serviço SoDa, usando a altitude do ponto informada "
-            "(a mesma registrada no download oficial do site). "
+            "acessado via serviço SoDa, "
+        )
+        pt += (
+            "usando a altitude do ponto informada (a mesma registrada no "
+            "download oficial do site). " if alt_ok else
+            "com a altitude do ponto estimada automaticamente pelo serviço "
+            "(base SRTM). "
         )
     if usou_nasa:
         pt += "A irradiância em céu real foi obtida da base NASA POWER. "
@@ -207,19 +239,28 @@ def gerar_metodologia(
     )
 
     # ----- Inglês -----
+    alt_en = (
+        f", altitude {_fmt(local.altitude, 0, False)} m" if alt_ok
+        else ", with altitude estimated from the SRTM database by the SoDa service"
+    )
     en = (
-        f"Solar radiation data were obtained for the municipality of "
-        f"{local.nome}, Brazil (latitude {_fmt(local.latitude, 4, False)}°, "
-        f"longitude {_fmt(local.longitude, 4, False)}°, altitude "
-        f"{_fmt(local.altitude, 0, False)} m), from {data_inicio:%Y-%m-%d} to "
+        f"Solar radiation data were obtained for the site of "
+        f"{local.nome} (latitude {_fmt(local.latitude, 4, False)}°, "
+        f"longitude {_fmt(local.longitude, 4, False)}°{alt_en}), "
+        f"from {data_inicio:%Y-%m-%d} to "
         f"{data_fim:%Y-%m-%d}, at a temporal resolution of {passo_rotulo}. "
     )
     if usou_mcclear:
         en += (
             "Clear-sky irradiance was estimated using the CAMS McClear model "
             "(Lefèvre et al., 2013; Gschwind et al., 2019), accessed through the "
-            "SoDa service, using the informed site altitude (the same recorded in "
-            "the official site download). "
+            "SoDa service, "
+        )
+        en += (
+            "using the informed site altitude (the same recorded in the "
+            "official site download). " if alt_ok else
+            "with the site altitude automatically estimated by the service "
+            "(SRTM database). "
         )
     if usou_nasa:
         en += "All-sky (real) irradiance was retrieved from the NASA POWER database. "

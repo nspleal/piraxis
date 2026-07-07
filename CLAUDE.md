@@ -142,14 +142,25 @@ Projeto acadêmico da UNESP; local padrão **Botucatu/SP** (−22.8867, −48.44
   limpo); (e) **`validar_pipeline` esperava abas sem "Gráficos"** → reprovava FALSO na máquina do
   pesquisador (só roda lá, com rede real); corrigido; (f) README: instrução de teste pós-split dos
   requirements + descrição do Excel com a aba Gráficos; docstring do exportador sem "E-mail SoDa".
-  ⚠️ **Ainda na fila (bloco 4, menor):** QC noturno (meio-dia fixo 12 UTC p/ passo diário quebra em
-  longitudes distantes; limiar 5 Wh/m² não escala com o passo); metodologia EN fixa ", Brazil" e vaza
-  altitude −999 (com afirmação falsa sobre origem da altitude); credenciais (JSON não-dict derruba o
-  boot; arquivo sem chmod 600; escrita não-atômica); médias diárias diluídas por dias 100% vazios
-  (cards/cascata/fechamento); completude combinada esconde lacuna por fonte; telemetria do Streamlit
-  ligada (falta gatherUsageStats=false); delta de dev-deps do empacotador não reverte upgrades de
-  transitivas compartilhadas; `use_container_width` deprecado (remoção após 2025-12-31, Streamlit);
-  `n_dias` mensal do Excel (~9% off, dormente com a UI sem mensal);
+  ✅ **BLOCO 4 (2026-07-07, testes 66/66 + validar_app APROVADO):** (a) **QC noturno**: passo
+  diário/mensal avalia o zênite no **meio-dia SOLAR local** (12h − longitude/15 — antes 12:00 UTC
+  fixas marcavam dias inteiros legítimos como "noturno suspeito" em longitudes distantes, ex. NZ);
+  limiar sub-horário virou **20 W/m² equivalentes escalados pelo passo** (`LIMIAR_NOTURNO_WM2`;
+  15 min continua 5 Wh, 1 min desceu de 5→0,33 Wh — antes ignorava artefatos de até ~300 W/m²);
+  (b) **metodologia**: sem ", Brazil" fixo (EN diz "site of", PT "localidade de"); altitude ≤ 0
+  (sentinela −999) **não vaza mais** — o texto diz corretamente "estimada pela base SRTM do serviço"
+  e a proveniência grava `altitude_m: null` + `altitude_origem`; NASA `atraso_dados: "~2 dias"`;
+  (c) **credenciais**: JSON não-objeto não derruba mais o app; arquivo nasce **0600** (dir 0700);
+  escrita **atômica** (temp + os.replace) preservando outras chaves; (d) **médias por dias COM dado**
+  (`_n_dias_com_dado`): cards/cascata/fechamento não diluem mais a média com dias 100% vazios;
+  (e) **completude por coluna** no QC (`completude_por_coluna` no RelatorioQC + aviso no resumo
+  quando a pior coluna fica >5 p.p. abaixo da geral — lacuna de uma fonte não se esconde mais);
+  (f) **telemetria off** (`gatherUsageStats=false` no .streamlit/config.toml); (g) **empacotador
+  reafirma os pins** após remover as dev-deps (reinstala do lock — upgrades de transitivas
+  compartilhadas voltam à versão pinada); (h) **`use_container_width` → `width="stretch"`** (10×;
+  API antiga sai do Streamlit após 2025-12-31); rótulos: "Série temporal — irradiação (passo de X)",
+  eixo "Tempo (UTC)", "Irradiação (Wh/m²)".
+  ⚠️ **Fila restante (miúda):** `n_dias` mensal do Excel (~9% off, dormente com a UI sem mensal);
   verificação SHA do runtime é best-effort; `VERSAO_FERRAMENTA` estática ("1.0") na proveniência;
   cache órfão nunca é limpo; detecção de CSV pt-BR tem janela cega < 100 Wh/m²; NASA achata 4xx/429
   em "verifique sua conexão"; `resposta_crua` vazia em cache hit (auditoria silenciosamente vazia);

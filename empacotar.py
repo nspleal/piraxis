@@ -493,6 +493,11 @@ def main() -> int:
     extras_dev = instalar_deps_dev(py)
     relatorio = validar(py, pkg)
     remover_deps_dev(py, extras_dev)
+    # Reafirma as versões de produção: o delta por NOME não pega o caso de a
+    # instalação de teste ter feito UPGRADE de uma transitiva compartilhada
+    # (ex.: packaging). Reinstalar do lock (--locked) traz qualquer pacote
+    # divergente de volta à versão pinada; com requirements.txt é no-op.
+    instalar_deps(py, args.locked)
     p = run([py, "-m", "pip", "check"], check=False)
     relatorio.append(
         ("OK  " if p.returncode == 0 else "FALHA ")
