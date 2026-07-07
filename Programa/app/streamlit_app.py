@@ -670,6 +670,18 @@ def _email_efetivo() -> str:
     return email_salvo or ""
 
 
+def _limpar_estado_extracao() -> None:
+    """Descarta os dados da extração anterior quando uma nova extração FALHA.
+
+    Sem isto, as abas continuariam mostrando a série antiga enquanto o
+    cabeçalho já exibe o local/período recém-escolhidos na barra lateral —
+    uma mistura silenciosamente inconsistente.
+    """
+    for chave in ("combinado", "brutos", "metadados", "qc", "repro",
+                  "periodo_arquivo"):
+        st.session_state.pop(chave, None)
+
+
 # ---------------------------------------------------------------------------
 # Extração (dispara ao clicar em "Extrair dados")
 # ---------------------------------------------------------------------------
@@ -726,7 +738,12 @@ if extrair:
             combinado = combinar(resultados, passos)
             progresso.progress(1.0, text="Concluído!")
 
-            # Guarda na sessão para os painéis e o download.
+            # Guarda na sessão para os painéis e o download. O contador de
+            # extração troca a key do uploader da conferência: um CSV subido
+            # para a extração anterior não é reaplicado ao novo período.
+            st.session_state["extracao_num"] = (
+                st.session_state.get("extracao_num", 0) + 1
+            )
             st.session_state["combinado"] = combinado
             st.session_state["brutos"] = brutos
             st.session_state["metadados"] = {
@@ -737,7 +754,6 @@ if extrair:
                 "periodo": f"{data_inicio:%d/%m/%Y} a {data_fim:%d/%m/%Y}",
                 "fontes": ", ".join(resultados.keys()),
                 "passo_temporal": rotulo_passo,
-                "email_soda": _email_efetivo() if usar_mcclear else "(não aplicável)",
             }
             st.session_state["periodo_arquivo"] = (data_inicio, data_fim, local.nome)
 
@@ -794,8 +810,10 @@ if extrair:
                         "período que termine alguns dias antes de hoje."
                     )
         except (RuntimeError, ValueError) as exc:
+            _limpar_estado_extracao()
             st.error(f"Não foi possível concluir a extração: {exc}")
         except Exception as exc:  # pragma: no cover - rede de segurança
+            _limpar_estado_extracao()
             st.error(
                 "Ocorreu um erro inesperado durante a extração. Detalhe técnico: "
                 f"{exc}"
@@ -989,7 +1007,10 @@ with aba_conf:
         base_nome2 = nome_arquivo_saida(nome_loc2, data_ini2, data_f2).stem
 
         arquivo_site = st.file_uploader(
-            "CSV do CAMS McClear baixado da SoDa", type=["csv"], key="conf_csv"
+            "CSV do CAMS McClear baixado da SoDa", type=["csv"],
+            # A key muda a cada extração: o CSV subido para a extração
+            # anterior não é reaplicado silenciosamente ao novo período.
+            key=f"conf_csv_{st.session_state.get('extracao_num', 0)}",
         )
         tem_mcclear = any(c in df.columns for c in ("GHI", "GHI_McClear"))
         if arquivo_site is not None and not tem_mcclear:
@@ -998,8 +1019,10 @@ with aba_conf:
                 "extração para comparar."
             )
         elif arquivo_site is not None:
+            import os
             import tempfile
 
+            caminho_tmp = None
             try:
                 with tempfile.NamedTemporaryFile("wb", suffix=".csv", delete=False) as tmp:
                     tmp.write(arquivo_site.getvalue())
@@ -1032,6 +1055,12 @@ with aba_conf:
                     file_name=f"{base_nome2}_fidelidade.md",
                     mime="text/markdown",
                 )
+            finally:
+                if caminho_tmp:
+                    try:
+                        os.unlink(caminho_tmp)
+                    except OSError:
+                        pass
 
         brutos = st.session_state.get("brutos") or {}
         if brutos:

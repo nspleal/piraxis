@@ -88,13 +88,19 @@ def test_resumo_estatisticas_em_a16(tmp_path):
     assert r["A1"].value == "PIRAXIS — Relatório de Radiação Solar"
     assert r["A2"].value == '=B4&" • "&B8'
     assert r["A3"].value == "Informações Gerais"
-    rotulos = [r.cell(row=i, column=1).value for i in range(4, 13)]
+    rotulos = [r.cell(row=i, column=1).value for i in range(4, 12)]
     assert rotulos == [
         "Local", "Latitude", "Longitude", "Altitude (m)", "Período",
-        "Fontes usadas", "Passo temporal", "E-mail SoDa usado",
-        "Data de geração",
+        "Fontes usadas", "Passo temporal", "Data de geração",
     ]
-    assert r["B12"].number_format == "@"
+    assert r["B11"].number_format == "@"
+    # Regressão (auditoria 2026-06-22): o e-mail SoDa é credencial pessoal e
+    # NÃO entra no Excel — mesmo que venha nos metadados, o exportador ignora.
+    valores_resumo = [
+        str(c.value) for linha in r.iter_rows() for c in linha if c.value
+    ]
+    assert not any("pesquisador@unesp.br" in v for v in valores_resumo)
+    assert not any("E-mail" in v for v in valores_resumo)
 
     # Estatísticas agora em A14 (título) / A16 (cabeçalho) / A17+ (dados).
     assert r["A14"].value == "Estatísticas de Radiação (W/m²)"

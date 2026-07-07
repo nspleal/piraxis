@@ -235,6 +235,36 @@ def congelar_lock(py: Path) -> Path:
     return lock
 
 
+def _freeze_nomes(py: Path) -> set[str]:
+    """Nomes (minúsculos) dos pacotes instalados no interpretador embutido."""
+    proc = run([py, "-m", "pip", "freeze"])
+    return {
+        linha.split("==")[0].strip().lower()
+        for linha in proc.stdout.splitlines()
+        if "==" in linha
+    }
+
+
+def instalar_deps_dev(py: Path) -> set[str]:
+    """Instala as deps de TESTE (requirements-dev.txt) só para a validação.
+
+    Retorna o conjunto de pacotes que a instalação ACRESCENTOU — é exatamente
+    o que ``remover_deps_dev`` desinstala depois, para que pytest/responses e
+    suas dependências exclusivas NÃO viajem dentro do pacote do usuário final
+    (bloat + mais arquivos profundos, que agravam o limite MAX_PATH).
+    """
+    antes = _freeze_nomes(py)
+    run([py, "-m", "pip", "install", "--no-input", "-r",
+         PROGRAMA / "requirements-dev.txt"])
+    return _freeze_nomes(py) - antes
+
+
+def remover_deps_dev(py: Path, extras: set[str]) -> None:
+    """Desinstala do interpretador embutido o que só entrou para a validação."""
+    if extras:
+        run([py, "-m", "pip", "uninstall", "-y", *sorted(extras)], check=False)
+
+
 def _ignore(_dir, nomes):
     return [n for n in nomes if n in EXCLUIR or n.endswith(".pyc")]
 
@@ -459,7 +489,15 @@ def main() -> int:
     gerar_launchers(pkg, alvo)
     escrever_leiame_raiz(pkg)
 
+    # Deps de teste entram SÓ para a validação e saem antes de zipar.
+    extras_dev = instalar_deps_dev(py)
     relatorio = validar(py, pkg)
+    remover_deps_dev(py, extras_dev)
+    p = run([py, "-m", "pip", "check"], check=False)
+    relatorio.append(
+        ("OK  " if p.returncode == 0 else "FALHA ")
+        + "pip check pós-remoção das deps de teste"
+    )
 
     zip_completo, zip_codigo = zipar(pkg, versao, args.alvo)
     manifesto = escrever_manifesto(versao, lock)

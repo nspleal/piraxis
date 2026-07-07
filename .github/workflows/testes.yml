@@ -1,0 +1,39 @@
+name: Testes
+
+# Roda a suíte de testes (pytest, sem rede) em TODO push e pull request.
+# É o gate automático de regressão — o build do pacote portátil continua
+# manual (empacotar-windows.yml) e valida o runtime embutido em separado.
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: testes-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v4
+
+      - name: Preparar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            Programa/requirements.txt
+            Programa/requirements-dev.txt
+
+      - name: Instalar dependências (produção + dev)
+        run: pip install -r Programa/requirements.txt -r Programa/requirements-dev.txt
+
+      - name: Rodar a suíte
+        working-directory: Programa
+        run: python -m pytest -q

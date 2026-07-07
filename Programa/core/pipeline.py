@@ -55,7 +55,7 @@ def extrair_mcclear_para_excel(
         "periodo": f"{data_inicio:%d/%m/%Y} a {data_fim:%d/%m/%Y}",
         "fontes": fonte.nome,
         "passo_temporal": rotulo,
-        "email_soda": email,
+        # Sem "email_soda": credencial pessoal não entra em saída compartilhável.
     }
 
     # Controle de qualidade + reprodutibilidade (mesmo caminho da interface).

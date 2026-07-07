@@ -1,5 +1,7 @@
 # Dependências do PIRAXIS (extrator de radiação solar, UNESP).
 # Instale com:  pip install -r requirements.txt
+# SÓ dependências de PRODUÇÃO — é isto que vai dentro do pacote portátil.
+# Ferramentas de desenvolvimento/teste ficam em requirements-dev.txt.
 streamlit>=1.30
 pandas>=2.0
 requests>=2.31
@@ -7,7 +9,3 @@ openpyxl>=3.1
 python-dotenv>=1.0
 plotly>=5.18
 pvlib>=0.11
-
-# Apenas para desenvolvimento/testes:
-pytest>=7.4
-responses>=0.24

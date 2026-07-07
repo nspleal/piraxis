@@ -40,6 +40,20 @@ _FREQ_POR_PASSO: dict[str, str] = {
 # Ordem de granularidade (índice maior = mais grosso).
 _ORDEM_PASSOS = ["PT01M", "PT15M", "PT01H", "P01D", "P01M"]
 
+# Duração de cada passo em horas (usada para escalar o limiar do kt).
+_HORAS_POR_PASSO: dict[str, float] = {
+    "PT01M": 1 / 60,
+    "PT15M": 0.25,
+    "PT01H": 1.0,
+    "P01D": 24.0,
+    "P01M": 720.0,
+}
+
+# Limiar mínimo de irradiância de céu limpo para calcular o kt, em W/m².
+# Abaixo disso (amanhecer/anoitecer, sol rasante) a divisão amplifica ruído e
+# descasamento de modelo: kt "explode" para 5–50 e polui médias e máximos.
+LIMIAR_KT_WM2 = 10.0
+
 
 def combinar(
     resultados: dict[str, pd.DataFrame],
@@ -97,7 +111,12 @@ def combinar(
         ghi_ceu_limpo = combinado.get(f"GHI_ceu_limpo_{SUFIXO_NASA}")
 
     if ghi_real is not None and ghi_ceu_limpo is not None:
-        combinado["kt"] = _indice_claridade(ghi_real, ghi_ceu_limpo)
+        passo_kt = None
+        if passos:
+            candidatos = [p for p in passos.values() if p in _ORDEM_PASSOS]
+            if candidatos:
+                passo_kt = max(candidatos, key=_ORDEM_PASSOS.index)
+        combinado["kt"] = _indice_claridade(ghi_real, ghi_ceu_limpo, passo_kt)
 
     return combinado
 
@@ -117,16 +136,25 @@ def _sufixar(df: pd.DataFrame, sufixo: str) -> pd.DataFrame:
     return df.rename(columns=renomear)
 
 
-def _indice_claridade(ghi_real: pd.Series, ghi_ceu_limpo: pd.Series) -> pd.Series:
-    """Calcula kt = GHI_real / GHI_ceu_limpo, tratando divisão por zero.
+def _indice_claridade(
+    ghi_real: pd.Series,
+    ghi_ceu_limpo: pd.Series,
+    passo_temporal: str | None = None,
+) -> pd.Series:
+    """Calcula kt = GHI_real / GHI_ceu_limpo com limiar físico no denominador.
 
-    À noite (céu limpo = 0 ou ausente) o resultado é NaN. O valor é mantido no
-    intervalo plausível [0, ~1] sem recortar artificialmente (pode passar
-    levemente de 1 por ruído de medição, o que é cientificamente esperado).
+    À noite o resultado é NaN. No amanhecer/anoitecer o céu limpo é positivo
+    porém minúsculo (poucos Wh/m²) e a divisão amplifica ruído/descasamento de
+    modelo — kt iria a 5–50 e poluiria médias e máximos. Por isso o kt só é
+    calculado onde o céu limpo ≥ ``LIMIAR_KT_WM2`` (equivalente em Wh/m² para
+    a duração do passo); fora disso é NaN. Acima do limiar, valores levemente
+    maiores que 1 são preservados (realce por nuvens é fisicamente esperado).
     """
     real = pd.to_numeric(ghi_real, errors="coerce")
     limpo = pd.to_numeric(ghi_ceu_limpo, errors="coerce")
-    kt = real / limpo.where(limpo > 0)
+    horas = _HORAS_POR_PASSO.get(passo_temporal or "PT01H", 1.0)
+    limiar_wh = LIMIAR_KT_WM2 * horas
+    kt = real / limpo.where(limpo >= limiar_wh)
     return kt
 
 
@@ -138,9 +166,10 @@ def _reamostrar_para_passo_comum(
     """Reamostra ambas as fontes para o passo comum mais GROSSO.
 
     Ex.: McClear em 1 min comparado com NASA horário -> tudo vira horário.
-    A agregação usa a média dos valores dentro de cada intervalo (apropriado
-    para irradiância média; para totais integrados a escolha seria a soma, mas
-    como normalizamos para Wh/m² por passo, a média mantém a comparabilidade).
+    A agregação usa a SOMA dos valores dentro de cada intervalo: os dados são
+    energia integrada por passo (Wh/m²), e energia se soma — a média deixaria
+    o passo grosso ~N× menor que o real (ex.: dia = média horária ≈ total/24)
+    e quebraria a escala do kt entre fontes de passos diferentes.
     """
     passo_mc = _passo_da_fonte(passos, "McClear")
     passo_nasa = _passo_da_fonte(passos, "NASA")
@@ -170,9 +199,14 @@ def _passo_da_fonte(passos: dict[str, str], chave: str) -> str | None:
 
 
 def _reamostrar(df: pd.DataFrame, freq: str) -> pd.DataFrame:
-    """Reamostra um DataFrame padronizado para a frequência ``freq`` (média)."""
+    """Reamostra um DataFrame padronizado para ``freq`` somando a energia.
+
+    ``min_count=1`` preserva o "não inventar zeros": um intervalo sem nenhum
+    dado vira NaN (a soma padrão do pandas transformaria vazio em 0.0).
+    """
     if df.empty:
         return df
     indexado = df.set_index("timestamp").sort_index()
-    agregado = indexado.resample(freq).mean(numeric_only=True)
+    numericas = indexado.select_dtypes("number")
+    agregado = numericas.resample(freq).sum(min_count=1)
     return agregado.reset_index()
