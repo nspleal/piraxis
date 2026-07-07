@@ -101,3 +101,45 @@ def test_geracao_dos_arquivos(tmp_path):
     dados = json.loads(caminho_json.read_text(encoding="utf-8"))
     assert dados["ferramenta"]
     assert "@" not in json.dumps(dados)
+
+
+def test_metodologia_sem_pais_fixo_e_sem_sentinela_de_altitude():
+    """Regressão (auditoria 2026-07-07): o texto EN fixava ", Brazil" para
+    qualquer ponto do globo, e a altitude-sentinela (-999) vazava para a
+    metodologia com a afirmação FALSA de que a altitude informada foi usada
+    (quando ≤ 0 o serviço SoDa estima por SRTM)."""
+    from core.config import Local
+    from core.reprodutibilidade import gerar_metodologia
+
+    ushuaia = Local("Ushuaia", -54.8, -68.3)  # altitude default: não informada
+    pt, en = gerar_metodologia(
+        ushuaia, date(2026, 1, 1), date(2026, 1, 3), "1 hora", ["CAMS McClear"]
+    )
+    assert "Brazil" not in en
+    assert "-999" not in pt and "-999" not in en
+    assert "SRTM" in pt and "SRTM" in en
+
+    # Com altitude informada, o número aparece e a claim do site vale.
+    pt2, en2 = gerar_metodologia(
+        BOTUCATU, date(2026, 1, 1), date(2026, 1, 3), "1 hora", ["CAMS McClear"]
+    )
+    assert "786" in pt2 and "786" in en2
+    assert "SRTM" not in pt2 and "SRTM" not in en2
+
+
+def test_proveniencia_altitude_sentinela_vira_none():
+    from core.config import Local
+
+    prov = montar_proveniencia(
+        Local("Ushuaia", -54.8, -68.3), date(2026, 1, 1), date(2026, 1, 3),
+        "PT01H", "1 hora", ["CAMS McClear"], ["GHI"],
+    )
+    assert prov["local"]["altitude_m"] is None
+    assert "SRTM" in prov["local"]["altitude_origem"]
+
+    prov2 = montar_proveniencia(
+        BOTUCATU, date(2026, 1, 1), date(2026, 1, 3),
+        "PT01H", "1 hora", ["CAMS McClear"], ["GHI"],
+    )
+    assert prov2["local"]["altitude_m"] == BOTUCATU.altitude
+    assert "informada" in prov2["local"]["altitude_origem"]

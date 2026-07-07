@@ -9,3 +9,8 @@ font = "sans serif"
 [client]
 toolbarMode = "minimal"        # esconde o botão "Deploy" e reduz o menu do Streamlit
 showSidebarNavigation = false
+
+[browser]
+# Ferramenta LOCAL e acadêmica: sem telemetria (o padrão do Streamlit é coletar
+# estatísticas de uso e enviar para a empresa).
+gatherUsageStats = false

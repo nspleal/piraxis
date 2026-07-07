@@ -16,8 +16,8 @@ sources/ e output/ e não é alterada aqui.
 
 Quatro telas (abas), com barra lateral fixa de configuração:
   1. **Painel** — resumo: cards de integrais diárias + kt, cascata de atenuação,
-     fechamento (GHI = BHI + DHI) e a série temporal horária.
-  2. **Série temporal** — o gráfico horário em destaque (real cheia · céu limpo
+     fechamento (GHI = BHI + DHI) e a série temporal no passo extraído.
+  2. **Série temporal** — o gráfico em destaque (real cheia · céu limpo
      tracejada), com filtro de componentes.
   3. **Conferência** — fechamento por registro, controle de qualidade, conferência
      de fidelidade com o site da SoDa e auditoria (respostas cruas).
@@ -349,6 +349,21 @@ def _n_dias(df: pd.DataFrame) -> int:
     return max(1, int(df["timestamp"].dt.normalize().nunique()))
 
 
+def _n_dias_com_dado(df: pd.DataFrame, serie: pd.Series) -> int:
+    """Dias distintos em que a SÉRIE tem dado (mínimo 1).
+
+    Divisor das médias diárias: dividir pelos dias de calendário diluía a
+    média quando o fim do período voltava vazio (datas recentes) — 7 dias
+    pedidos com 2 sem dado subestimavam o kWh/m²·dia em ~29%.
+    """
+    if "timestamp" not in df.columns:
+        return 1
+    mask = serie.notna().to_numpy()
+    if not mask.any():
+        return 1
+    return max(1, int(df["timestamp"][mask].dt.normalize().nunique()))
+
+
 def _unidade_dado(metadados: dict | None) -> str:
     """Unidade do dado conforme o passo (Wh/m² em todos os passos do projeto)."""
     return "Wh/m²"
@@ -381,7 +396,7 @@ def _transmitancia_ceu_limpo(df: pd.DataFrame, fontes: str | None) -> float | No
     return float(ghi.sum() / soma_toa)
 
 
-def _layout_dark(fig: go.Figure, ylab: str = "Irradiância (Wh/m²)") -> go.Figure:
+def _layout_dark(fig: go.Figure, ylab: str = "Irradiação (Wh/m²)") -> go.Figure:
     """Aplica o layout escuro padrão a um gráfico Plotly."""
     fig.update_layout(
         template="plotly_dark",
@@ -389,7 +404,7 @@ def _layout_dark(fig: go.Figure, ylab: str = "Irradiância (Wh/m²)") -> go.Figu
         plot_bgcolor="rgba(0,0,0,0)",
         font=dict(family="JetBrains Mono, monospace", color=TXT2, size=12),
         xaxis=dict(
-            title="Hora (UTC)", gridcolor="rgba(255,255,255,0.06)",
+            title="Tempo (UTC)", gridcolor="rgba(255,255,255,0.06)",
             zeroline=False, linecolor="rgba(255,255,255,0.14)",
         ),
         yaxis=dict(
@@ -455,7 +470,6 @@ def _figura_series(
 
 def _html_cards(df: pd.DataFrame, metadados: dict | None) -> str:
     """Grade de cards de métrica (integral diária + pico) por componente + kt."""
-    n_dias = _n_dias(df)
     unidade = _unidade_dado(metadados)
     fontes = (metadados or {}).get("fontes", "")
     cartoes: list[str] = []
@@ -463,7 +477,8 @@ def _html_cards(df: pd.DataFrame, metadados: dict | None) -> str:
         serie, origem = _serie_com_origem(df, comp)
         if serie is None or not serie.notna().any():
             continue
-        integral = serie.sum() / n_dias / 1000.0  # kWh/m²/dia
+        # Média pelos dias COM dado desta série (não pelos dias de calendário).
+        integral = serie.sum() / _n_dias_com_dado(df, serie) / 1000.0  # kWh/m²/dia
         pico = serie.max()
         cor = CORES[comp]
         # Na extração combinada a NASA não tem BHI/TOA — cada card diz de qual
@@ -519,9 +534,9 @@ def _html_cascata(df: pd.DataFrame, fontes: str | None = None) -> str | None:
     barras fisicamente impossíveis (ex.: BHI > GHI em dia nublado).
     """
     toa = _serie_ceu_limpo(df, "TOA", fontes)
-    n_dias = _n_dias(df)
     if toa is None or not toa.sum():
         return None
+    n_dias = _n_dias_com_dado(df, toa)
     toa_int = toa.sum()
     colunas: list[str] = []
     for comp in ORDEM_CASCATA:
@@ -564,7 +579,7 @@ def _html_fechamento(df: pd.DataFrame, fontes: str | None = None) -> str | None:
     dhi = _serie_ceu_limpo(df, "DHI", fontes)
     if ghi is None or bhi is None or dhi is None:
         return None
-    n_dias = _n_dias(df)
+    n_dias = _n_dias_com_dado(df, ghi)
     soma = bhi + dhi
     resid = (ghi - soma).abs()
     dmax = float(resid.max()) if resid.notna().any() else 0.0
@@ -680,7 +695,7 @@ with st.sidebar:
 
     st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
     extrair = st.button(
-        "Extrair dados", type="primary", use_container_width=True
+        "Extrair dados", type="primary", width="stretch"
     )
 
 
@@ -964,16 +979,21 @@ with aba_painel:
         if not ativos:
             ativos = _componentes_presentes(df)
         if ativos:
+            passo_rotulo = (meta or {}).get("passo_temporal", "")
+            titulo_serie = (
+                f"Série temporal — irradiação (passo de {passo_rotulo})"
+                if passo_rotulo else "Série temporal — irradiação por passo"
+            )
             st.markdown(
                 "<div class='rad-panel-title' style='margin-top:8px'>"
-                "Série temporal — irradiância horária</div>"
+                f"{titulo_serie}</div>"
                 f"<div style='font-size:12px;color:{TXT3};margin-bottom:8px'>"
                 "— real (cheia) · ┈ céu limpo (tracejada)</div>",
                 unsafe_allow_html=True,
             )
             with st.container(border=True):
                 st.plotly_chart(
-                    _figura_series(df, ativos), use_container_width=True,
+                    _figura_series(df, ativos), width="stretch",
                     config=PLOTLY_CFG, key="grafico_painel",
                 )
 
@@ -1005,7 +1025,7 @@ with aba_serie:
         with st.container(border=True):
             st.plotly_chart(
                 _figura_series(df, ativos, mostrar_ceu_limpo=mostrar_ceu),
-                use_container_width=True, config=PLOTLY_CFG, key="grafico_serie",
+                width="stretch", config=PLOTLY_CFG, key="grafico_serie",
             )
 
 
@@ -1053,7 +1073,7 @@ with aba_conf:
                     "Status": resid.lt(TOL_FECHAMENTO).map({True: "✓", False: "✗"}),
                 }
             )
-            st.dataframe(tabela, use_container_width=True, height=360, hide_index=True)
+            st.dataframe(tabela, width="stretch", height=360, hide_index=True)
         else:
             st.caption(
                 "Conferência de fechamento indisponível: requer GHI, BHI e DHI "
@@ -1079,7 +1099,7 @@ with aba_conf:
                 st.text(qc.resumo_texto)
                 if qc.lacunas:
                     st.caption(f"Lacunas: {len(qc.lacunas)} intervalo(s).")
-                    st.dataframe(pd.DataFrame(qc.lacunas), use_container_width=True)
+                    st.dataframe(pd.DataFrame(qc.lacunas), width="stretch")
                 nan_itens = {k: v for k, v in qc.nan_por_coluna.items() if v}
                 if nan_itens:
                     st.caption("Valores ausentes (NaN) por coluna:")
@@ -1141,7 +1161,7 @@ with aba_conf:
                 st.text(rel.resumo_texto)
                 if rel.por_componente:
                     st.dataframe(
-                        pd.DataFrame(rel.por_componente).T, use_container_width=True
+                        pd.DataFrame(rel.por_componente).T, width="stretch"
                     )
                 st.download_button(
                     "⬇️ Baixar relatório de fidelidade (.md)",
@@ -1200,14 +1220,14 @@ with aba_dados:
             f"Tabela completa com **{len(df)}** registros do período (UTC). A "
             "planilha Excel inclui exatamente estes dados."
         )
-        st.dataframe(df, use_container_width=True, height=420, hide_index=True)
+        st.dataframe(df, width="stretch", height=420, hide_index=True)
 
         data_ini, data_f, nome_loc = st.session_state["periodo_arquivo"]
         base_nome = nome_arquivo_saida(nome_loc, data_ini, data_f).stem
 
         col_xlsx, col_csv = st.columns(2)
         with col_xlsx:
-            if st.button("📊 Gerar planilha Excel", use_container_width=True):
+            if st.button("📊 Gerar planilha Excel", width="stretch"):
                 try:
                     caminho = nome_arquivo_saida(nome_loc, data_ini, data_f)
                     exporta(
@@ -1220,7 +1240,7 @@ with aba_dados:
                             "⬇️ Baixar planilha (.xlsx)",
                             data=fh.read(), file_name=caminho.name,
                             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                            use_container_width=True,
+                            width="stretch",
                         )
                     st.success(f"Planilha gerada: {caminho.name}")
                 except Exception as exc:  # pragma: no cover
@@ -1230,7 +1250,7 @@ with aba_dados:
                 "⬇️ Exportar CSV",
                 data=df.to_csv(index=False).encode("utf-8"),
                 file_name=f"{base_nome}.csv", mime="text/csv",
-                use_container_width=True,
+                width="stretch",
             )
 
         # Reprodutibilidade e citações.

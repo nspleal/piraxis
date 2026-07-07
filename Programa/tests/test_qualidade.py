@@ -149,3 +149,48 @@ def test_status_geral_ok_em_dados_limpos():
     assert rel.status_geral == "OK"
     assert rel.n_negativos == 0
     assert rel.n_noturno_suspeito == 0
+
+
+def test_noturno_diario_avalia_no_meio_dia_solar_local():
+    """Regressão (auditoria 2026-07-07): no passo diário o zênite era avaliado
+    às 12:00 UTC fixas — meia-noite local na Nova Zelândia — e TODO dia
+    legítimo virava "radiação noturna suspeita". Agora usa o meio-dia SOLAR
+    local (12h − longitude/15)."""
+    from core.config import Local
+
+    nz = Local("Wellington", -41.29, 174.78, 20.0)
+    ts = pd.date_range("2024-01-01", periods=5, freq="D")
+    df = pd.DataFrame({"timestamp": ts, "GHI": [7500.0] * 5, "DHI": [2500.0] * 5})
+    rel = analisar_qualidade(df, nz, "P01D", ["CAMS McClear"])
+    assert rel.n_noturno_suspeito == 0
+
+
+def test_noturno_sub_horario_limiar_escala_com_o_passo():
+    """Regressão (auditoria 2026-07-07): o limiar noturno fixo (5 Wh/m²) fazia
+    o QC de 1 minuto ignorar artefatos de até ~300 W/m² equivalentes. Agora o
+    limiar é 20 W/m² equivalentes, escalado pela duração do passo."""
+    ts = pd.date_range("2024-01-01 03:00", periods=10, freq="1min")  # noite
+    df = pd.DataFrame({"timestamp": ts, "GHI": [2.0] * 10})  # ≡ 120 W/m²
+    rel = analisar_qualidade(df, BOTUCATU, "PT01M", ["CAMS McClear"])
+    assert rel.n_noturno_suspeito == 10
+
+
+def test_completude_por_coluna_expoe_lacuna_de_fonte():
+    """Regressão (auditoria 2026-07-07): a completude geral conta o instante
+    como presente se QUALQUER coluna tem dado — uma fonte majoritariamente
+    vazia ficava escondida atrás da outra no combinado."""
+    ts = pd.date_range("2024-01-01", periods=24, freq="h")
+    df = pd.DataFrame(
+        {
+            "timestamp": ts,
+            "GHI_McClear": [100.0] * 24,
+            "GHI_NASA": [100.0] * 12 + [float("nan")] * 12,
+        }
+    )
+    rel = analisar_qualidade(
+        df, BOTUCATU, "PT01H", ["CAMS McClear", "NASA POWER"]
+    )
+    assert rel.completude_pct == 100.0
+    assert rel.completude_por_coluna["GHI_NASA"] == 50.0
+    assert rel.completude_por_coluna["GHI_McClear"] == 100.0
+    assert "GHI_NASA" in rel.resumo_texto  # o resumo aponta a pior coluna

@@ -20,7 +20,9 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
+import tempfile
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -53,6 +55,13 @@ def carregar_email() -> str | None:
     except (json.JSONDecodeError, OSError) as exc:
         logger.warning("Não foi possível ler %s: %s", ARQUIVO_CONFIG, exc)
         return None
+    if not isinstance(dados, dict):
+        # JSON VÁLIDO porém não-objeto (ex.: uma string solta) também é
+        # arquivo corrompido — sem esta guarda, dados.get() estourava
+        # AttributeError e derrubava o app na abertura.
+        logger.warning("Conteúdo inesperado em %s (não é um objeto JSON).",
+                       ARQUIVO_CONFIG)
+        return None
 
     email = dados.get("email_soda")
     if email and email_valido(email):
@@ -73,17 +82,42 @@ def salvar_email(email: str) -> None:
         )
 
     DIR_CONFIG.mkdir(parents=True, exist_ok=True)
+    _restringir_permissoes(DIR_CONFIG, 0o700)
 
     # Preserva eventuais outras chaves já presentes no arquivo.
     dados: dict = {}
     if ARQUIVO_CONFIG.exists():
         try:
-            dados = json.loads(ARQUIVO_CONFIG.read_text(encoding="utf-8"))
+            lido = json.loads(ARQUIVO_CONFIG.read_text(encoding="utf-8"))
+            if isinstance(lido, dict):
+                dados = lido
         except (json.JSONDecodeError, OSError):
             dados = {}
 
     dados["email_soda"] = email
-    ARQUIVO_CONFIG.write_text(
-        json.dumps(dados, ensure_ascii=False, indent=2), encoding="utf-8"
+    # Escrita ATÔMICA (temp + os.replace): um crash no meio da gravação não
+    # deixa o config.json truncado. E o arquivo nasce 0600 — o e-mail é a
+    # credencial SoDa e não deve ficar legível por outros usuários da máquina.
+    fd, tmp_nome = tempfile.mkstemp(
+        dir=str(DIR_CONFIG), prefix=".config-", suffix=".tmp"
     )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(json.dumps(dados, ensure_ascii=False, indent=2))
+        _restringir_permissoes(Path(tmp_nome), 0o600)
+        os.replace(tmp_nome, ARQUIVO_CONFIG)
+    except BaseException:
+        try:
+            os.unlink(tmp_nome)
+        except OSError:
+            pass
+        raise
     logger.info("E-mail SoDa salvo em %s.", ARQUIVO_CONFIG)
+
+
+def _restringir_permissoes(caminho: Path, modo: int) -> None:
+    """chmod best-effort (no Windows as permissões POSIX não se aplicam)."""
+    try:
+        os.chmod(caminho, modo)
+    except OSError:  # pragma: no cover - sistemas sem suporte
+        pass

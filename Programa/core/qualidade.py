@@ -39,13 +39,28 @@ FREQ_POR_PASSO: dict[str, str] = {
 }
 
 # Deslocamento até o ponto médio de cada período (para a geometria solar).
+# Passos diário/mensal NÃO estão aqui: usam o meio-dia SOLAR local (função
+# _offset_meio), que depende da longitude do ponto.
 _OFFSET_MEIO = {
     "PT01M": pd.Timedelta(seconds=30),
     "PT15M": pd.Timedelta(minutes=7, seconds=30),
     "PT01H": pd.Timedelta(minutes=30),
-    "P01D": pd.Timedelta(hours=12),
-    "P01M": pd.Timedelta(days=15),
 }
+
+
+def _offset_meio(passo_temporal: str, local) -> pd.Timedelta:
+    """Deslocamento do rótulo até o instante de avaliação da geometria solar.
+
+    Passos ≤ 1 h: o meio do intervalo. Passos diário/mensal: o **meio-dia
+    solar local** do período (12 h − longitude/15°/h). Usar 12:00 UTC fixo
+    avaliaria o zênite de madrugada em longitudes distantes do meridiano de
+    Greenwich (ex.: Nova Zelândia) e marcaria dias inteiros legítimos como
+    "radiação noturna suspeita".
+    """
+    if passo_temporal in ("P01D", "P01M"):
+        base = pd.Timedelta(days=15) if passo_temporal == "P01M" else pd.Timedelta(0)
+        return base + pd.Timedelta(hours=12.0 - local.longitude / 15.0)
+    return _OFFSET_MEIO.get(passo_temporal, pd.Timedelta(0))
 
 # Duração do passo em horas (para limiares proporcionais ao passo).
 _DT_HORAS = {"PT01M": 1 / 60, "PT15M": 0.25, "PT01H": 1.0, "P01D": 24.0, "P01M": 720.0}
@@ -55,6 +70,12 @@ _TOL_ENVELOPE = {"PT01M": 0.25, "PT15M": 0.25, "PT01H": 0.10, "P01D": 0.10, "P01
 
 # Ruído de arredondamento tolerado em valores negativos (Wh/m²).
 TOL_NEGATIVO = -1.0
+
+# Limiar do check noturno sub-horário, em POTÊNCIA equivalente (W/m²). Os
+# dados são energia POR PASSO (Wh/m²), então o limiar em Wh escala com a
+# duração do passo — o mesmo artefato físico dispara igual em 1 e em 15 min
+# (fixo em 5 Wh, 1 min só flagrava a partir de ~300 W/m² equivalentes).
+LIMIAR_NOTURNO_WM2 = 20.0
 
 
 @dataclass
@@ -76,6 +97,10 @@ class RelatorioQC:
     resumo_texto: str
     # Tolerâncias usadas (para a legenda autoexplicativa no Excel).
     criterios: dict = field(default_factory=dict)
+    # Completude POR COLUNA (%): a completude geral conta um instante como
+    # presente se QUALQUER coluna tem dado — numa extração combinada, uma
+    # fonte majoritariamente vazia ficava escondida atrás da outra.
+    completude_por_coluna: dict = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -189,13 +214,17 @@ def analisar_qualidade(
     nan_por_coluna = {
         c: int(df[c].isna().sum()) for c in papeis.cols_radiacao
     }
+    completude_por_coluna = {
+        c: round(
+            float(df[c].notna().sum()) / total_esperado * 100, 1
+        ) if total_esperado else 100.0
+        for c in papeis.cols_radiacao
+    }
 
     # --- Geometria solar (zênite no ponto médio) ---------------------------
     zenite = None
     if n > 0 and "timestamp" in df.columns and df["timestamp"].notna().any():
-        meio = pd.to_datetime(df["timestamp"]) + _OFFSET_MEIO.get(
-            passo_temporal, pd.Timedelta(0)
-        )
+        meio = pd.to_datetime(df["timestamp"]) + _offset_meio(passo_temporal, local)
         try:
             zenite = _zenite(pd.DatetimeIndex(meio), local)
         except Exception as exc:  # pragma: no cover - pvlib robustez
@@ -235,6 +264,15 @@ def analisar_qualidade(
         status, completude, total_esperado, total_presente, lacunas, n_negativos,
         n_noturno, envelope, fechamento, concordancia,
     )
+    if completude_por_coluna:
+        pior_col = min(completude_por_coluna, key=completude_por_coluna.get)
+        pior_pct = completude_por_coluna[pior_col]
+        if pior_pct < completude - 5.0:
+            resumo += (
+                f"\n⚠️ Completude por coluna: {pior_col} tem só {pior_pct:.1f}% "
+                "dos instantes com dado (a completude geral conta o instante "
+                "como presente se qualquer coluna tem dado)."
+            )
 
     return RelatorioQC(
         status_geral=status,
@@ -251,6 +289,7 @@ def analisar_qualidade(
         flags_por_linha=flags,
         resumo_texto=resumo,
         criterios=criterios,
+        completude_por_coluna=completude_por_coluna,
     )
 
 
@@ -328,11 +367,12 @@ def _verificar_noturno(df, papeis, zenite, passo_temporal):
         return flag, 0
 
     sub_horario = passo_temporal in ("PT01M", "PT15M")
-    # Sub-horário: noite = zênite>90 e limiar baixo. Agregado (≥1h): só o
-    # fisicamente impossível -> zênite bem abaixo (>96°) e valor alto.
+    # Sub-horário: noite = zênite>90 e limiar proporcional ao passo (20 W/m²
+    # equivalentes). Agregado (≥1h): só o fisicamente impossível -> zênite
+    # bem abaixo (>96° no instante avaliado) e valor alto no período.
     if sub_horario:
         noite = zenite > 90.0
-        limiar = 5.0
+        limiar = LIMIAR_NOTURNO_WM2 * _DT_HORAS.get(passo_temporal, 1.0)
     else:
         noite = zenite > 96.0
         limiar = 50.0
