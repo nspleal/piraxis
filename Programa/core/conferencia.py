@@ -276,6 +276,7 @@ def comparar(
             "media_abs": 0.0,
             "max_rel": 0.0,
             "n_fora_tol": 0,
+            "n_ref_zero_fora": 0,
         }
         if n_aval:
             diff = (va - vb).abs()
@@ -289,11 +290,17 @@ def comparar(
             fora = valido & (diff > tol_abs) & (
                 rel.fillna(float("inf")) > tol_rel
             )
+            # Contados à parte porque não entram no max_rel (o relativo é
+            # indefinido): valor não nulo onde o site marca 0. É o pior tipo
+            # de desvio para a fidelidade (dado "fabricado") e por isso
+            # classifica direto como "Diferenças relevantes".
+            ref_zero_fora = valido & denom.isna() & (diff > tol_abs)
             metrica.update(
                 max_abs=round(float(diff[valido].max()), 4),
                 media_abs=round(float(diff[valido].mean()), 4),
                 max_rel=round(max_rel, 4),
                 n_fora_tol=int(fora.sum()),
+                n_ref_zero_fora=int(ref_zero_fora.sum()),
             )
             status = _pior(status, _status_componente(metrica))
         por_componente[c] = metrica
@@ -355,6 +362,10 @@ _ORDEM_STATUS = ["Idêntico", "Diferenças pequenas", "Diferenças relevantes"]
 def _status_componente(metrica: dict) -> str:
     if metrica["n_fora_tol"] == 0:
         return "Idêntico"
+    # Valor onde o site marca 0 = desvio relativo infinito: sempre relevante
+    # (não entra no max_rel, que só cobre pontos com relativo definido).
+    if metrica.get("n_ref_zero_fora", 0) > 0:
+        return "Diferenças relevantes"
     if metrica["max_rel"] > LIMIAR_RELEVANTE:
         return "Diferenças relevantes"
     return "Diferenças pequenas"
@@ -377,11 +388,17 @@ def _montar_resumo(rel: RelatorioFidelidade) -> str:
         f"({rel.n_so_extracao} só na extração, {rel.n_so_referencia} só no site)."
     )
     for comp, m in rel.por_componente.items():
-        linhas.append(
+        linha = (
             f"{comp}: máx |Δ| {m['max_abs']:.2f} Wh/m² · máx rel "
             f"{m['max_rel'] * 100:.2f}% · {m['n_fora_tol']} fora de tolerância "
             f"({m['n_avaliado']} avaliados)."
         )
+        if m.get("n_ref_zero_fora", 0):
+            linha += (
+                f" ⚠️ {m['n_ref_zero_fora']} ponto(s) com valor onde o site "
+                "marca 0 (desvio relativo indefinido — tratado como relevante)."
+            )
+        linhas.append(linha)
     if rel.componentes_so_extracao:
         linhas.append(
             "Componentes só na extração: "
@@ -421,6 +438,20 @@ def formatar_relatorio_md(rel: RelatorioFidelidade) -> str:
                 f"{m['max_rel'] * 100:.2f}% | {m['n_fora_tol']} |"
             )
         md.append("")
+        com_zero = {
+            comp: m["n_ref_zero_fora"]
+            for comp, m in rel.por_componente.items()
+            if m.get("n_ref_zero_fora", 0)
+        }
+        if com_zero:
+            partes = ", ".join(f"{c}: {n}" for c, n in com_zero.items())
+            md.append(
+                f"> ⚠️ Pontos com valor onde o site marca 0 ({partes}) — o "
+                "desvio relativo é indefinido nesses pontos (não entra no "
+                '"Máx rel."), e o componente é classificado como '
+                '"Diferenças relevantes".'
+            )
+            md.append("")
     for a in rel.avisos:
         md.append(f"> ⚠️ {a}")
     if rel.avisos:

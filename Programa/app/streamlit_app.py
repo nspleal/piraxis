@@ -287,11 +287,47 @@ def _fmt_num(valor: float | None, casas: int = 0) -> str:
 
 def _serie(df: pd.DataFrame, comp: str) -> pd.Series | None:
     """Série representativa do componente: prefere o real (NASA), depois a base,
-    depois o céu limpo (McClear) — cobre extração única e combinada."""
+    depois o céu limpo (McClear) — cobre extração única e combinada.
+
+    ⚠️ Numa extração COMBINADA isto pode devolver fontes diferentes para
+    componentes diferentes (a NASA não tem BHI/TOA). Serve para presença e
+    visualizações que ROTULAM a origem; contas físicas que relacionam
+    componentes entre si (fechamento, cascata) devem usar `_serie_ceu_limpo`
+    para não misturar real com céu limpo.
+    """
     for cand in (f"{comp}_NASA", comp, f"{comp}_McClear"):
         if cand in df.columns:
             return df[cand]
     return None
+
+
+def _serie_ceu_limpo(
+    df: pd.DataFrame, comp: str, fontes: str | None
+) -> pd.Series | None:
+    """Série de CÉU LIMPO (CAMS McClear) do componente, SEM misturar fontes.
+
+    Combinada: usa a coluna sufixada ``<comp>_McClear``. Fonte única: usa a
+    coluna base, mas só se a extração incluiu o McClear (senão a coluna base
+    seria dado REAL da NASA — e identidades de céu limpo não se aplicam).
+    """
+    if f"{comp}_McClear" in df.columns:
+        return df[f"{comp}_McClear"]
+    if comp in df.columns and "mcclear" in (fontes or "").lower():
+        return df[comp]
+    return None
+
+
+def _serie_com_origem(
+    df: pd.DataFrame, comp: str
+) -> tuple[pd.Series | None, str | None]:
+    """Série representativa + etiqueta de origem (só quando há sufixo de fonte)."""
+    if f"{comp}_NASA" in df.columns:
+        return df[f"{comp}_NASA"], "real · NASA"
+    if comp in df.columns:
+        return df[comp], None
+    if f"{comp}_McClear" in df.columns:
+        return df[f"{comp}_McClear"], "céu limpo · McClear"
+    return None, None
 
 
 def _combinado_duas_fontes(df: pd.DataFrame) -> bool:
@@ -319,10 +355,24 @@ def _unidade_dado(metadados: dict | None) -> str:
 
 
 def _kt_medio(df: pd.DataFrame) -> float | None:
-    """Índice de claridade diário kt = ΣGHI / ΣTOA (ou média da coluna kt)."""
+    """kt médio (índice de claridade do projeto: GHI real / GHI céu limpo).
+
+    Só existe na extração COMBINADA (a coluna ``kt`` vem do combinador, já com
+    o limiar físico no denominador). Média dos passos válidos.
+    """
     if "kt" in df.columns and df["kt"].notna().any():
         return float(df["kt"].mean())
-    ghi, toa = _serie(df, "GHI"), _serie(df, "TOA")
+    return None
+
+
+def _transmitancia_ceu_limpo(df: pd.DataFrame, fontes: str | None) -> float | None:
+    """GHI/TOA do CÉU LIMPO (transmitância atmosférica média do McClear).
+
+    Métrica DIFERENTE do kt (não envolve dado real) — exibida com o próprio
+    nome para a extração só-McClear não mostrar ~0,7 rotulado como kt.
+    """
+    ghi = _serie_ceu_limpo(df, "GHI", fontes)
+    toa = _serie_ceu_limpo(df, "TOA", fontes)
     if ghi is None or toa is None:
         return None
     soma_toa = toa.sum()
@@ -407,49 +457,75 @@ def _html_cards(df: pd.DataFrame, metadados: dict | None) -> str:
     """Grade de cards de métrica (integral diária + pico) por componente + kt."""
     n_dias = _n_dias(df)
     unidade = _unidade_dado(metadados)
+    fontes = (metadados or {}).get("fontes", "")
     cartoes: list[str] = []
     for comp in ORDEM_CARDS:
-        serie = _serie(df, comp)
+        serie, origem = _serie_com_origem(df, comp)
         if serie is None or not serie.notna().any():
             continue
         integral = serie.sum() / n_dias / 1000.0  # kWh/m²/dia
         pico = serie.max()
         cor = CORES[comp]
+        # Na extração combinada a NASA não tem BHI/TOA — cada card diz de qual
+        # fonte veio, para não misturar real e céu limpo em silêncio.
+        sub = f"pico {_fmt_num(pico, 0)} {unidade}"
+        if origem:
+            sub += f" · {origem}"
         cartoes.append(
             f"<div class='rad-card'>"
             f"<div class='rad-card-head'><span class='rad-dot' style='background:{cor}'></span>"
             f"<span class='rad-card-label'>{comp} · {NOMES_COMPONENTES[comp]}</span></div>"
             f"<div class='rad-card-val'>{_fmt_num(integral, 2)}"
             f"<span class='rad-card-unit'>kWh/m²</span></div>"
-            f"<div class='rad-card-sub'>pico {_fmt_num(pico, 0)} {unidade}</div>"
+            f"<div class='rad-card-sub'>{sub}</div>"
             f"</div>"
         )
     kt = _kt_medio(df)
     if kt is not None:
+        # kt do projeto = GHI real / GHI céu limpo (só existe no combinado).
         cartoes.append(
             f"<div class='rad-card'>"
             f"<div class='rad-card-head'><span class='rad-dot' style='background:{AMBAR}'></span>"
             f"<span class='rad-card-label'>kt · índice de claridade</span></div>"
             f"<div class='rad-card-val' style='color:{AMBAR}'>{_fmt_num(kt, 3)}"
-            f"<span class='rad-card-unit'>GHI / TOA</span></div>"
-            f"<div class='rad-card-sub'>diário · adimensional</div>"
+            f"<span class='rad-card-unit'>GHI real / céu limpo</span></div>"
+            f"<div class='rad-card-sub'>média dos passos válidos · adimensional</div>"
             f"</div>"
         )
+    else:
+        trans = _transmitancia_ceu_limpo(df, fontes)
+        if trans is not None:
+            # Extração só-McClear: não há "real" para medir claridade — o que
+            # existe é a transmitância do céu limpo, exibida com o nome certo.
+            cartoes.append(
+                f"<div class='rad-card'>"
+                f"<div class='rad-card-head'><span class='rad-dot' style='background:{AMBAR}'></span>"
+                f"<span class='rad-card-label'>GHI/TOA · transmitância de céu limpo</span></div>"
+                f"<div class='rad-card-val' style='color:{AMBAR}'>{_fmt_num(trans, 3)}"
+                f"<span class='rad-card-unit'>GHI / TOA</span></div>"
+                f"<div class='rad-card-sub'>céu limpo (McClear) · adimensional</div>"
+                f"</div>"
+            )
     if not cartoes:
         return ""
     return "<div class='rad-cards'>" + "".join(cartoes) + "</div>"
 
 
-def _html_cascata(df: pd.DataFrame) -> str | None:
-    """Cascata de atenuação: barras em % da irradiância no topo da atmosfera."""
-    toa = _serie(df, "TOA")
+def _html_cascata(df: pd.DataFrame, fontes: str | None = None) -> str | None:
+    """Cascata de atenuação do CÉU LIMPO: barras em % do topo da atmosfera.
+
+    Usa exclusivamente as colunas do McClear: a cascata é uma identidade do
+    céu limpo, e misturar GHI real (NASA) com TOA/BHI de céu limpo produzia
+    barras fisicamente impossíveis (ex.: BHI > GHI em dia nublado).
+    """
+    toa = _serie_ceu_limpo(df, "TOA", fontes)
     n_dias = _n_dias(df)
     if toa is None or not toa.sum():
         return None
     toa_int = toa.sum()
     colunas: list[str] = []
     for comp in ORDEM_CASCATA:
-        serie = _serie(df, comp)
+        serie = _serie_ceu_limpo(df, comp, fontes)
         if serie is None:
             continue
         integ = serie.sum()
@@ -469,15 +545,23 @@ def _html_cascata(df: pd.DataFrame) -> str | None:
         "<div class='rad-panel-title'>Cascata de atenuação</div>"
         "<div class='rad-casc'>" + "".join(colunas) + "</div>"
         "<div class='rad-note'>Atenuação física da luz do topo da atmosfera (TOA) "
-        "à superfície. Barras em % da irradiância no topo; valores em kWh/m²·dia. "
-        "GHI separa-se em feixe (BHI) e difusa (DHI); DNI é o feixe na normal.</div>"
+        "à superfície, no <b>céu limpo</b> (CAMS McClear). Barras em % da irradiação "
+        "no topo; valores em kWh/m²·dia. GHI separa-se em feixe (BHI) e difusa "
+        "(DHI); DNI é o feixe na normal.</div>"
         "</div>"
     )
 
 
-def _html_fechamento(df: pd.DataFrame) -> str | None:
-    """Painel de fechamento GHI = BHI + DHI com o resíduo Δ validado."""
-    ghi, bhi, dhi = _serie(df, "GHI"), _serie(df, "BHI"), _serie(df, "DHI")
+def _html_fechamento(df: pd.DataFrame, fontes: str | None = None) -> str | None:
+    """Painel de fechamento GHI = BHI + DHI (identidade do CÉU LIMPO).
+
+    Usa exclusivamente as colunas do McClear: no combinado, comparar
+    GHI_NASA (real) com BHI_McClear + DHI_NASA estourava a tolerância e
+    pintava o selo vermelho em qualquer dia nublado.
+    """
+    ghi = _serie_ceu_limpo(df, "GHI", fontes)
+    bhi = _serie_ceu_limpo(df, "BHI", fontes)
+    dhi = _serie_ceu_limpo(df, "DHI", fontes)
     if ghi is None or bhi is None or dhi is None:
         return None
     n_dias = _n_dias(df)
@@ -507,7 +591,8 @@ def _html_fechamento(df: pd.DataFrame) -> str | None:
         f"<span>{di(ghi)}</span><span style='color:{TXT3}'>=</span>"
         f"<span>{di(bhi)}</span><span style='color:{TXT3}'>+</span>"
         f"<span>{di(dhi)}</span></div>"
-        f"<div style='font-size:11px;color:{TXT3};text-align:center'>kWh/m² · dia</div>"
+        f"<div style='font-size:11px;color:{TXT3};text-align:center'>"
+        "kWh/m² · dia — céu limpo (CAMS McClear)</div>"
         f"{selo}</div>"
     )
 
@@ -854,9 +939,10 @@ with aba_painel:
         if cards:
             st.markdown(cards, unsafe_allow_html=True)
 
+        fontes_meta = (meta or {}).get("fontes", "")
         col_casc, col_fech = st.columns([1.5, 1])
         with col_casc:
-            casc = _html_cascata(df)
+            casc = _html_cascata(df, fontes_meta)
             if casc:
                 st.markdown(casc, unsafe_allow_html=True)
             else:
@@ -865,12 +951,13 @@ with aba_painel:
                     "(presente na extração do CAMS McClear)."
                 )
         with col_fech:
-            fech = _html_fechamento(df)
+            fech = _html_fechamento(df, fontes_meta)
             if fech:
                 st.markdown(fech, unsafe_allow_html=True)
             else:
                 st.caption(
-                    "Fechamento indisponível: requer GHI, BHI e DHI na extração."
+                    "Fechamento indisponível: requer GHI, BHI e DHI do céu "
+                    "limpo (extração com o CAMS McClear)."
                 )
 
         ativos = [c for c in componentes_ativos if _serie(df, c) is not None]
@@ -928,15 +1015,18 @@ with aba_conf:
         _aviso_vazio()
     else:
         df = st.session_state["combinado"]
+        fontes_conf = (st.session_state.get("metadados") or {}).get("fontes", "")
         st.markdown(
             "<div style='font-family:Space Grotesk,sans-serif;font-weight:500;"
             f"font-size:22px;color:{TXT}'>Conferência de fechamento</div>"
             f"<div style='font-size:13px;color:{TXT2};margin-bottom:6px'>"
-            "GHI = BHI + DHI · por registro</div>",
+            "GHI = BHI + DHI · por registro · céu limpo (CAMS McClear)</div>",
             unsafe_allow_html=True,
         )
 
-        ghi, bhi, dhi = _serie(df, "GHI"), _serie(df, "BHI"), _serie(df, "DHI")
+        ghi = _serie_ceu_limpo(df, "GHI", fontes_conf)
+        bhi = _serie_ceu_limpo(df, "BHI", fontes_conf)
+        dhi = _serie_ceu_limpo(df, "DHI", fontes_conf)
         if ghi is not None and bhi is not None and dhi is not None:
             soma = bhi + dhi
             resid = (ghi - soma).abs()
@@ -1012,7 +1102,11 @@ with aba_conf:
             # anterior não é reaplicado silenciosamente ao novo período.
             key=f"conf_csv_{st.session_state.get('extracao_num', 0)}",
         )
-        tem_mcclear = any(c in df.columns for c in ("GHI", "GHI_McClear"))
+        # Só há o que conferir se a extração inclui o McClear DE FATO — uma
+        # extração só-NASA também tem a coluna "GHI" (real), mas compará-la
+        # com o CSV de céu limpo do site seria comparar grandezas diferentes.
+        fontes_fid = (st.session_state.get("metadados") or {}).get("fontes", "")
+        tem_mcclear = _serie_ceu_limpo(df, "GHI", fontes_fid) is not None
         if arquivo_site is not None and not tem_mcclear:
             st.info(
                 "A conferência atual é do CAMS McClear — inclua o McClear na "

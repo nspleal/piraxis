@@ -10,7 +10,8 @@ exatamente esta estrutura, com duas abas:
       · título "PIRAXIS — Relatório de Radiação Solar" (A1:D1, fundo azul 1F5C8B);
       · subtítulo dinâmico ``=B4&" • "&B8`` (Local • Período);
       · bloco "Informações Gerais" (Local, Latitude, Longitude, Altitude,
-        Período, Fontes usadas, Passo temporal, E-mail SoDa, Data de geração);
+        Período, Fontes usadas, Passo temporal, Data de geração — SEM o
+        e-mail SoDa: credencial pessoal não entra em saída compartilhável);
       · tabela "Estatísticas de Radiação" com FÓRMULAS Excel sobre a tabela
         estruturada TabDados: Média (AVERAGE), Média Diurna (AVERAGEIF >0),
         Máximo (MAX), Mínimo Diurno (MINIFS >0), Energia (SUM) e kWh/m²/dia;

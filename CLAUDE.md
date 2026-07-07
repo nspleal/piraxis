@@ -129,7 +129,27 @@ Projeto acadêmico da UNESP; local padrão **Botucatu/SP** (−22.8867, −48.44
   média deixava o passo grosso ~N× menor), `min_count=1` preserva "não inventar zeros";
   (j) **CI de testes** novo: `.github/workflows/testes.yml` roda pytest em todo push/PR (gate que
   faltava p/ o modo auto-merge).
-  ⚠️ **Ainda na fila (menor):** `n_dias` mensal do Excel (~9% off, dormente com a UI sem mensal);
+  ✅ **BLOCO 3 (2ª varredura, 2026-07-07, testes 57/57 + validar_app APROVADO):** (a) **app não mistura
+  mais fontes no combinado**: novo `_serie_ceu_limpo` (só McClear) usado no **fechamento** (painel e aba
+  Conferência — antes comparava `GHI_NASA ≈ BHI_McClear + DHI_NASA` e pintava selo vermelho em dia
+  nublado) e na **cascata** (antes podia mostrar BHI > GHI, fisicamente impossível); cards ganham
+  **etiqueta de origem** ("real · NASA"/"céu limpo · McClear") no combinado; (b) **card do kt honesto**:
+  kt (= GHI real/céu limpo, definição do projeto) só no combinado; extração só-McClear mostra
+  **"GHI/TOA · transmitância de céu limpo"** (antes ~0,7 rotulado como kt "GHI / TOA"); (c) **conferência:
+  espúrio-sobre-zero agora é "Diferenças relevantes"** (novo `n_ref_zero_fora`; relativo indefinido não
+  entra no max_rel — resumo e MD explicam o ponto, sem o contraditório "máx rel 0,00% · 1 fora");
+  (d) **guarda `tem_mcclear` correta** (extração só-NASA não compara mais dado real com CSV de céu
+  limpo); (e) **`validar_pipeline` esperava abas sem "Gráficos"** → reprovava FALSO na máquina do
+  pesquisador (só roda lá, com rede real); corrigido; (f) README: instrução de teste pós-split dos
+  requirements + descrição do Excel com a aba Gráficos; docstring do exportador sem "E-mail SoDa".
+  ⚠️ **Ainda na fila (bloco 4, menor):** QC noturno (meio-dia fixo 12 UTC p/ passo diário quebra em
+  longitudes distantes; limiar 5 Wh/m² não escala com o passo); metodologia EN fixa ", Brazil" e vaza
+  altitude −999 (com afirmação falsa sobre origem da altitude); credenciais (JSON não-dict derruba o
+  boot; arquivo sem chmod 600; escrita não-atômica); médias diárias diluídas por dias 100% vazios
+  (cards/cascata/fechamento); completude combinada esconde lacuna por fonte; telemetria do Streamlit
+  ligada (falta gatherUsageStats=false); delta de dev-deps do empacotador não reverte upgrades de
+  transitivas compartilhadas; `use_container_width` deprecado (remoção após 2025-12-31, Streamlit);
+  `n_dias` mensal do Excel (~9% off, dormente com a UI sem mensal);
   verificação SHA do runtime é best-effort; `VERSAO_FERRAMENTA` estática ("1.0") na proveniência;
   cache órfão nunca é limpo; detecção de CSV pt-BR tem janela cega < 100 Wh/m²; NASA achata 4xx/429
   em "verifique sua conexão"; `resposta_crua` vazia em cache hit (auditoria silenciosamente vazia);
