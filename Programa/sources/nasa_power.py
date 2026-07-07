@@ -29,7 +29,7 @@ claridade (kt) sem sentido físico e picos de radiação em horas erradas — a
 from __future__ import annotations
 
 import logging
-from datetime import date
+from datetime import date, timedelta
 
 import pandas as pd
 import requests
@@ -59,6 +59,11 @@ SENTINELA_AUSENTE = -999.0
 # diário devolveria só o valor do dia 1º rotulado como o mês inteiro.
 PASSOS_SUPORTADOS: dict[str, str] = {"PT01H": "horário", "P01D": "diário"}
 
+# Defasagem típica de publicação da NASA POWER (dias). Datas mais recentes que
+# hoje-DEFASAGEM voltam como -999 (tudo NaN) — "extração vazia sem erro". Por
+# isso rejeitamos com mensagem clara, como o CAMS já faz.
+DEFASAGEM_DIAS = 2
+
 
 class NasaPower(FonteRadiacao):
     """Cliente da fonte NASA POWER (radiação real, com nuvens)."""
@@ -77,6 +82,11 @@ class NasaPower(FonteRadiacao):
             -180.0 <= local.longitude <= 180.0
         )
 
+    @staticmethod
+    def ultima_data_disponivel() -> date:
+        """Data mais recente aceita (hoje - defasagem de publicação)."""
+        return date.today() - timedelta(days=DEFASAGEM_DIAS)
+
     # ------------------------------------------------------------------
     def buscar(
         self,
@@ -92,6 +102,19 @@ class NasaPower(FonteRadiacao):
                 f"A NASA POWER não oferece o passo temporal '{passo_temporal}': "
                 f"apenas {suportados}. Escolha um destes passos ou extraia sem "
                 "a fonte NASA POWER."
+            )
+        if data_inicio > data_fim:
+            raise ValueError(
+                "A data de início não pode ser depois da data de fim. "
+                "Revise o período escolhido."
+            )
+        limite = self.ultima_data_disponivel()
+        if data_fim > limite:
+            raise ValueError(
+                "Os dados da NASA POWER levam alguns dias para serem publicados. "
+                f"A data final pedida ({data_fim:%d/%m/%Y}) ainda não está "
+                f"disponível. A data mais recente que você pode usar é "
+                f"{limite:%d/%m/%Y}. Ajuste o período e tente de novo."
             )
 
         # Cache primeiro: mesma consulta nunca rebate na API.

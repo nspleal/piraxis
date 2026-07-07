@@ -113,13 +113,28 @@ Projeto acadêmico da UNESP; local padrão **Botucatu/SP** (−22.8867, −48.44
   **Release atualizada sem apagar antes** (upload --clobber + edit + tag rolante movida; sem janela de
   404), **`include-hidden-files: true`** (o v4 excluía `.streamlit/` do artefato — tema escuro!) e
   **`concurrency`** (builds simultâneos não se corrompem). Testes: **49/49** (2 regressões novas).
-  ⚠️ **Pendências da auditoria (fila):** e-mail SoDa impresso na aba Resumo do Excel (contradiz a
-  política do módulo de reprodutibilidade); conferência quebra com extração combinada (colunas
-  duplicadas) e dá "Idêntico" falso quando o site ≈ 0; NASA sem validação de lag de datas; estado do
-  app persiste após falha parcial; `pytest`/`responses` embarcados no pacote (mover p/ dev);
-  `CACHE_HABILITADO` é config morta; kt sem teto no crepúsculo; `n_dias` mensal do Excel (~9% off,
-  dormente com a UI sem mensal); verificação SHA do runtime é best-effort; sem CI de testes em
-  push/PR; sem README/LICENSE (relevante p/ INPI).
+  ✅ **BLOCO 2 DA AUDITORIA — CORRIGIDO (2026-07-07, testes 57/57):** (a) **e-mail SoDa fora do
+  Excel** (exportador ignora `email_soda` mesmo se vier nos metadados; app/pipeline não enviam mais);
+  (b) **conferência com extração combinada** usa só as colunas `_McClear` (acabou a duplicata) e
+  (c) **referência ≈ 0 conta como fora de tolerância** (desvio relativo indefinido = ∞, não 0 —
+  espúrio noturno não passa mais como "Idêntico"); (d) **NASA valida datas** (início≤fim; rejeita
+  data_fim > hoje−2 com mensagem clara, como o CAMS); (e) **falha de extração limpa o estado** da
+  sessão (sem dados velhos sob cabeçalho novo) + **uploader da conferência reseta a cada extração**
+  + temp file da conferência é apagado; (f) **`pytest`/`responses` fora do pacote**: `requirements.txt`
+  é só produção, novo `requirements-dev.txt`; `empacotar.py` instala deps de teste SÓ p/ validar e
+  **desinstala antes de zipar** (delta de `pip freeze`; `pip check` pós-remoção no relatório); lock
+  limpo (sem pytest/responses/pluggy/iniconfig); (g) **`CACHE_HABILITADO` funciona** (`.env` com
+  false → não lê nem grava cache); (h) **kt com limiar físico**: só calculado onde céu limpo ≥ 10 W/m²
+  equivalente ao passo (crepúsculo = NaN, não 5–50); (i) **reamostragem por SOMA** (energia integra;
+  média deixava o passo grosso ~N× menor), `min_count=1` preserva "não inventar zeros";
+  (j) **CI de testes** novo: `.github/workflows/testes.yml` roda pytest em todo push/PR (gate que
+  faltava p/ o modo auto-merge).
+  ⚠️ **Ainda na fila (menor):** `n_dias` mensal do Excel (~9% off, dormente com a UI sem mensal);
+  verificação SHA do runtime é best-effort; `VERSAO_FERRAMENTA` estática ("1.0") na proveniência;
+  cache órfão nunca é limpo; detecção de CSV pt-BR tem janela cega < 100 Wh/m²; NASA achata 4xx/429
+  em "verifique sua conexão"; `resposta_crua` vazia em cache hit (auditoria silenciosamente vazia);
+  porta fixa 8599 na validação do build; `manifesto.json`/zip só-código gerados sem consumidor;
+  sem README/LICENSE (relevante p/ INPI).
 - **🎯 PRINCÍPIO DE FIDELIDADE (travado 2026-06-21):** toda extração deve sair **idêntica à sua
   fonte** — CAMS McClear no formato do CAMS; NASA POWER no formato da NASA. Hoje o Excel está fiel ao
   **CAMS** (período em faixa início–fim UTC, altitude do ponto, 4 casas decimais). ⚠️ **Ao trabalhar a

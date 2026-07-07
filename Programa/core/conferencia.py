@@ -208,20 +208,25 @@ def _sem_fuso(serie: pd.Series) -> pd.Series:
     return ts
 
 
-def _normalizar(df: pd.DataFrame) -> pd.DataFrame:
-    """Prepara um DataFrame para conferência: tira sufixo de fonte (_McClear),
-    mantém timestamp + componentes conhecidos e remove o fuso do timestamp."""
-    renomear = {}
-    for c in df.columns:
-        base = c.replace("_McClear", "").replace("_NASA", "")
-        if base in COMPONENTES and c != base:
-            renomear[c] = base
-    df = df.rename(columns=renomear)
+def _normalizar(df: pd.DataFrame, sufixo_fonte: str = "_McClear") -> pd.DataFrame:
+    """Prepara um DataFrame para conferência: seleciona os componentes da fonte
+    conferida e remove o fuso do timestamp.
+
+    Numa extração COMBINADA (McClear + NASA) as colunas vêm sufixadas
+    (``GHI_McClear``, ``GHI_NASA``). A conferência é contra o site do McClear,
+    então cada componente usa a coluna ``<comp><sufixo_fonte>`` quando existir
+    e só cai para ``<comp>`` (extração de fonte única). As colunas das OUTRAS
+    fontes são ignoradas — antes, ambas eram renomeadas para o mesmo nome e a
+    duplicata quebrava a comparação (mascarada como "CSV ilegível").
+    """
     if "timestamp" not in df.columns:
         raise ValueError("DataFrame sem coluna 'timestamp' para conferência.")
-    cols = ["timestamp"] + [c for c in COMPONENTES if c in df.columns]
-    saida = df[cols].copy()
-    saida["timestamp"] = _sem_fuso(saida["timestamp"])
+    saida = pd.DataFrame({"timestamp": _sem_fuso(df["timestamp"])})
+    for comp in COMPONENTES:
+        if f"{comp}{sufixo_fonte}" in df.columns:
+            saida[comp] = df[f"{comp}{sufixo_fonte}"].to_numpy()
+        elif comp in df.columns:
+            saida[comp] = df[comp].to_numpy()
     return saida.dropna(subset=["timestamp"]).drop_duplicates(subset="timestamp")
 
 
@@ -278,7 +283,12 @@ def comparar(
             rel = diff / denom
             rel_validos = rel[valido].dropna()
             max_rel = float(rel_validos.max()) if len(rel_validos) else 0.0
-            fora = valido & (diff > tol_abs) & (rel.fillna(0.0) > tol_rel)
+            # Referência ≈ 0 (noite): o desvio relativo é indefinido (NaN).
+            # Tratamos como INFINITO, não como 0 — um valor espúrio onde o
+            # site marca 0 é justamente o que a conferência deve acusar.
+            fora = valido & (diff > tol_abs) & (
+                rel.fillna(float("inf")) > tol_rel
+            )
             metrica.update(
                 max_abs=round(float(diff[valido].max()), 4),
                 media_abs=round(float(diff[valido].mean()), 4),

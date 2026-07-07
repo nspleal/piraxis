@@ -398,7 +398,8 @@ def _escrever_resumo(
         ("Período", metadados.get("periodo", "")),
         ("Fontes usadas", metadados.get("fontes", "")),
         ("Passo temporal", metadados.get("passo_temporal", "")),
-        ("E-mail SoDa usado", metadados.get("email_soda", "(não aplicável)")),
+        # O e-mail SoDa é credencial PESSOAL e não entra em nenhuma saída
+        # compartilhável (mesma política do módulo de reprodutibilidade).
         (
             "Data de geração",
             metadados.get(

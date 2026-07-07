@@ -202,3 +202,36 @@ def test_conferir_avisa_corrompido_e_altitude(tmp_path):
     assert any("Altitude diferente" in a for a in rel.avisos)
     # Avisos aparecem no relatório em Markdown.
     assert "Altitude diferente" in formatar_relatorio_md(rel)
+
+
+def test_extracao_combinada_usa_so_colunas_mcclear():
+    """Regressão (auditoria 2026-06-22): num df combinado (McClear+NASA), as
+    duas colunas eram renomeadas para o MESMO nome (duplicata) e a comparação
+    quebrava. Agora a conferência usa só as colunas _McClear."""
+    ref = _ex()
+    combinado = pd.DataFrame(
+        {
+            "timestamp": ref["timestamp"],
+            "GHI_McClear": ref["GHI"].to_numpy(),      # idêntico ao site
+            "GHI_NASA": ref["GHI"].to_numpy() * 0.5,   # real (nublado) — ignorar
+            "DHI_McClear": ref["DHI"].to_numpy(),
+            "kt": 0.5,
+        }
+    )
+    rel = comparar(combinado, ref)
+    assert rel.status == "Idêntico"
+    assert rel.por_componente["GHI"]["n_fora_tol"] == 0
+    # Se a NASA tivesse sido usada, o desvio seria de 50%.
+    assert rel.por_componente["GHI"]["max_abs"] == 0.0
+
+
+def test_espurio_sobre_referencia_zero_nao_e_identico():
+    """Regressão (auditoria 2026-06-22): valor espúrio onde o site marca 0
+    (noite) passava como "Idêntico" — o desvio relativo indefinido virava 0.
+    Agora conta como fora de tolerância."""
+    ex, ref = _ex(), _ex()
+    ref.loc[0, "GHI"] = 0.0   # site: noite
+    ex.loc[0, "GHI"] = 3.0    # extração: 3 Wh/m² espúrios (> tol_abs)
+    rel = comparar(ex, ref)
+    assert rel.por_componente["GHI"]["n_fora_tol"] >= 1
+    assert rel.status != "Idêntico"

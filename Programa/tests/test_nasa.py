@@ -206,3 +206,38 @@ def test_passo_mensal_fora_da_interface():
 
     assert "P01M" not in PASSOS_TEMPORAIS.values()
     assert set(PASSOS_TEMPORAIS.values()) == {"PT01M", "PT15M", "PT01H", "P01D"}
+
+
+def test_rejeita_datas_futuras_e_invertidas():
+    """Regressão (auditoria 2026-06-22): datas recentes/futuras voltavam como
+    -999 -> tudo NaN, sem erro ("extração vazia"). Agora rejeita com mensagem
+    clara, como o CAMS já fazia."""
+    import pytest
+    from datetime import timedelta
+
+    fonte = NasaPower()
+    hoje = date.today()
+    with pytest.raises(ValueError, match="ainda não está"):
+        fonte.buscar(BOTUCATU, hoje - timedelta(days=1), hoje, "PT01H")
+    with pytest.raises(ValueError, match="início não pode"):
+        fonte.buscar(BOTUCATU, date(2024, 1, 5), date(2024, 1, 1), "PT01H")
+
+
+@responses.activate
+def test_cache_pode_ser_desligado(monkeypatch):
+    """Regressão (auditoria 2026-06-22): CACHE_HABILITADO era configuração
+    morta. Com false, a mesma consulta volta a bater na API (e nada é salvo)."""
+    responses.add(
+        responses.GET, ENDPOINT_HORARIO, json=_payload_horario(), status=200
+    )
+    responses.add(
+        responses.GET, ENDPOINT_HORARIO, json=_payload_horario(), status=200
+    )
+    monkeypatch.setenv("CACHE_HABILITADO", "false")
+
+    fonte = NasaPower()
+    args = (BOTUCATU, date(2024, 1, 1), date(2024, 1, 1), "PT01H")
+    fonte.buscar(*args)
+    fonte.buscar(*args)  # sem cache -> segunda chamada de rede
+
+    assert len(responses.calls) == 2

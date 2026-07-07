@@ -26,7 +26,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from core.config import CACHE_DIR
+from core.config import CACHE_DIR, Config
 
 logger = logging.getLogger(__name__)
 
@@ -119,7 +119,9 @@ class FonteRadiacao(ABC):
         return CACHE_DIR / f"{chave}.csv"
 
     def _ler_cache(self, chave: str) -> pd.DataFrame | None:
-        """Lê o cache se existir; retorna None caso contrário."""
+        """Lê o cache se existir (e se o cache estiver habilitado)."""
+        if not Config().cache_habilitado:
+            return None
         caminho = self._caminho_cache(chave)
         if caminho.exists():
             logger.info("[%s] Lendo do cache: %s", self.nome, caminho.name)
@@ -128,7 +130,9 @@ class FonteRadiacao(ABC):
         return None
 
     def _salvar_cache(self, chave: str, df: pd.DataFrame) -> None:
-        """Salva o DataFrame no cache local."""
+        """Salva o DataFrame no cache local (a menos que esteja desabilitado)."""
+        if not Config().cache_habilitado:
+            return
         caminho = self._caminho_cache(chave)
         df.to_csv(caminho, index=False)
         logger.info("[%s] Resposta salva no cache: %s", self.nome, caminho.name)

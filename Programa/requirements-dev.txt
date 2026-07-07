@@ -1,0 +1,4 @@
+# Dependências de DESENVOLVIMENTO/TESTE do PIRAXIS (não vão no pacote portátil).
+# Instale com:  pip install -r requirements.txt -r requirements-dev.txt
+pytest>=7.4
+responses>=0.24
