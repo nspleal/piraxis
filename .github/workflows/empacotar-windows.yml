@@ -2,31 +2,48 @@ name: Empacotar PIRAXIS (Windows portátil)
 
 # Gera o PACOTE PORTÁTIL de Windows (Python embutido) numa máquina Windows da
 # própria GitHub. Ninguém precisa instalar Python — nem para gerar, nem para
-# rodar. O resultado fica guardado em DOIS lugares:
+# rodar. O resultado fica em DOIS lugares, com a MESMA estrutura interna
+# (python/, Programa/ e o INICIAR PIRAXIS.bat na raiz do zip — camada única):
 #
 #   1. RELEASE "pacote-windows" (PERMANENTE, link fixo, NÃO expira)  <-- use este
 #      Página: .../releases/tag/pacote-windows
 #      Download direto: .../releases/download/pacote-windows/PIRAXIS-windows-x64.zip
-#      É a "cópia para sempre": cada execução do workflow ATUALIZA esta Release.
+#      Cada execução ATUALIZA a Release existente (troca o asset), sem apagar
+#      antes — assim o link nunca fica fora do ar se um build falhar no meio.
 #
-#   2. ARTEFATO "PIRAXIS-windows-x64" (temporário, expira em 90 dias)
-#      Anexado à execução, útil como cópia da build específica.
+#   2. ARTEFATO "PIRAXIS-windows-x64" (cópia da build, expira em 90 dias).
 #
 # Como ATUALIZAR (para um novo teste no laboratório), pelo navegador:
-#   1. Aba "Actions" -> "Empacotar PIRAXIS (Windows portátil)".
-#   2. "Run workflow" -> confirmar. Em uns minutos a Release "pacote-windows"
-#      já aponta para a versão nova (mesmo link de sempre).
+#   Aba "Actions" -> "Empacotar PIRAXIS (Windows portátil)" -> "Run workflow".
+#   Em minutos a Release aponta para a versão nova (mesmo link de sempre).
 #
-# Como USAR na máquina de destino (sem Python):
-#   Baixe PIRAXIS-windows-x64.zip, extraia em um caminho CURTO (ex.: C:\PIRAXIS)
-#   e dê dois cliques em INICIAR PIRAXIS.bat. O caminho curto evita o limite de
-#   260 caracteres do Windows (que faz o descompactador pular arquivos).
+# Reprodutibilidade: por padrão o build instala EXATAMENTE as versões do
+# Programa/requirements.lock (--locked) — dois builds em datas diferentes
+# geram o mesmo ambiente. Para ATUALIZAR as dependências de propósito, marque
+# a opção "Atualizar dependências" ao disparar: o build resolve o
+# requirements.txt de novo e publica o requirements.lock regenerado como
+# artefato ("requirements-lock-novo") para ser commitado no repositório.
+#
+# Como USAR na máquina de destino (sem Python): baixe PIRAXIS-windows-x64.zip,
+# extraia em um caminho CURTO (ex.: C:\PIRAXIS) e dê dois cliques em
+# INICIAR PIRAXIS.bat. O caminho curto evita o limite de 260 caracteres do
+# Windows (que faz o descompactador pular arquivos sem avisar).
 
 on:
-  workflow_dispatch:        # disparo manual pelo botão "Run workflow"
+  workflow_dispatch:
+    inputs:
+      atualizar_dependencias:
+        description: "Atualizar dependências (re-resolver o requirements.txt e regravar o lock)?"
+        type: boolean
+        default: false
+
+# Nunca dois builds mexendo na mesma Release ao mesmo tempo.
+concurrency:
+  group: empacotar-windows
+  cancel-in-progress: false
 
 permissions:
-  contents: write           # necessário para publicar/atualizar a Release
+  contents: write           # publicar/atualizar a Release e mover a tag rolante
 
 jobs:
   build-windows:
@@ -41,7 +58,15 @@ jobs:
           python-version: "3.12"
 
       - name: Gerar o pacote portátil (Windows x64) + validar
-        run: python empacotar.py --alvo windows-x64
+        shell: bash
+        run: |
+          if [ "${{ inputs.atualizar_dependencias }}" = "true" ]; then
+            # Atualização DELIBERADA: resolve o requirements.txt de novo.
+            python empacotar.py --alvo windows-x64
+          else
+            # Padrão: build reprodutível com as versões EXATAS do lock.
+            python empacotar.py --alvo windows-x64 --locked
+          fi
 
       - name: Guardar/atualizar a Release PERMANENTE "pacote-windows"
         env:
@@ -60,20 +85,41 @@ jobs:
             "Como usar: baixe PIRAXIS-windows-x64.zip, extraia em um caminho CURTO (exemplo: C:\\PIRAXIS) e dê dois cliques em INICIAR PIRAXIS.bat." \
             > dist/release-notes.md
 
-          # Release ROLANTE: apaga a anterior (+ tag) e recria apontando para o commit atual.
-          gh release delete pacote-windows --yes --cleanup-tag 2>/dev/null || true
-          gh release create pacote-windows "dist/PIRAXIS-windows-x64.zip" \
-            --title "PIRAXIS — pacote Windows (mais recente)" \
-            --notes-file dist/release-notes.md \
-            --latest \
-            --target "$GITHUB_SHA"
+          TITULO="PIRAXIS — pacote Windows (mais recente)"
+          if gh release view pacote-windows >/dev/null 2>&1; then
+            # ATUALIZA a Release existente — sem apagar antes, sem janela de 404.
+            gh release upload pacote-windows "dist/PIRAXIS-windows-x64.zip" --clobber
+            gh release edit pacote-windows --title "$TITULO" \
+              --notes-file dist/release-notes.md --latest
+            # Move a tag ROLANTE para o commit atual (ponteiro de release, não
+            # reescrita de histórico — é o padrão de "rolling release").
+            git push --force origin "HEAD:refs/tags/pacote-windows"
+          else
+            gh release create pacote-windows "dist/PIRAXIS-windows-x64.zip" \
+              --title "$TITULO" \
+              --notes-file dist/release-notes.md \
+              --latest \
+              --target "$GITHUB_SHA"
+          fi
 
       - name: Anexar o pacote COMPLETO também como artefato (cópia da build)
         uses: actions/upload-artifact@v4
         with:
           name: PIRAXIS-windows-x64
-          # Sobe a PASTA do pacote (não o .zip interno) -> download em camada única.
+          # Sobe a PASTA do pacote -> download em camada única (igual à Release).
           path: dist/PIRAXIS
           if-no-files-found: error
           retention-days: 90
           compression-level: 6
+          # Sem isto o v4 EXCLUI arquivos/pastas ocultos — perderíamos o
+          # Programa/.streamlit/config.toml (tema escuro) e o .env.example.
+          include-hidden-files: true
+
+      - name: Publicar o requirements.lock regenerado (p/ commitar no repo)
+        if: ${{ inputs.atualizar_dependencias }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: requirements-lock-novo
+          path: Programa/requirements.lock
+          if-no-files-found: error
+          retention-days: 30

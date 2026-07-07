@@ -581,9 +581,12 @@ def _escrever_graficos(
                 cel = ws.cell(row=r, column=1 + k)
                 # Soma por dia: extrai a data (10 primeiros caracteres) do texto
                 # do período e compara com a data da linha. /1000 -> kWh/m².
+                # O token de ano em TEXT() DEVE ser o canônico "yyyy" (o arquivo
+                # .xlsx armazena fórmulas na forma invariante en-US; o Excel
+                # pt-BR traduz sozinho na exibição). "aaaa" quebraria a soma.
                 cel.value = (
                     '=SUMPRODUCT(--(LEFT(TabDados[Período (UTC)],10)'
-                    f'=TEXT($A{r},"dd/mm/aaaa")),TabDados[{rot}])/1000'
+                    f'=TEXT($A{r},"dd/mm/yyyy")),TabDados[{rot}])/1000'
                 )
                 cel.number_format = "0.00"
                 cel.font = _fonte_normal
