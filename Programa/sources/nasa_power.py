@@ -53,6 +53,12 @@ MAPA_PARAMETROS: dict[str, str] = {
 # Valor sentinela de ausência usado pela NASA POWER.
 SENTINELA_AUSENTE = -999.0
 
+# A NASA POWER só oferece as resoluções horária e diária. Passos fora desta
+# tabela são REJEITADOS com erro claro (nunca rebaixados em silêncio): rebaixar
+# 1 min/15 min para horário deixaria a série ~98% vazia, e "1 mês" no endpoint
+# diário devolveria só o valor do dia 1º rotulado como o mês inteiro.
+PASSOS_SUPORTADOS: dict[str, str] = {"PT01H": "horário", "P01D": "diário"}
+
 
 class NasaPower(FonteRadiacao):
     """Cliente da fonte NASA POWER (radiação real, com nuvens)."""
@@ -80,15 +86,21 @@ class NasaPower(FonteRadiacao):
         passo_temporal: str,
     ) -> pd.DataFrame:
         """Busca radiação real na NASA POWER e retorna DataFrame padronizado."""
+        if passo_temporal not in PASSOS_SUPORTADOS:
+            suportados = " e ".join(PASSOS_SUPORTADOS.values())
+            raise ValueError(
+                f"A NASA POWER não oferece o passo temporal '{passo_temporal}': "
+                f"apenas {suportados}. Escolha um destes passos ou extraia sem "
+                "a fonte NASA POWER."
+            )
+
         # Cache primeiro: mesma consulta nunca rebate na API.
         chave = self._chave_cache(local, data_inicio, data_fim, passo_temporal)
         em_cache = self._ler_cache(chave)
         if em_cache is not None:
             return em_cache
 
-        # A NASA POWER só oferece resolução horária ou diária. Passos mais finos
-        # (1 min, 15 min) caem para horário; mensal cai para diário.
-        diario = passo_temporal in {"P01D", "P01M"}
+        diario = passo_temporal == "P01D"
         endpoint = ENDPOINT_DIARIO if diario else ENDPOINT_HORARIO
 
         parametros = {

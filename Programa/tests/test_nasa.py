@@ -183,3 +183,26 @@ def test_cache_evita_segunda_chamada():
 
     # Apenas uma chamada de rede foi registrada.
     assert len(responses.calls) == 1
+
+
+def test_rejeita_passos_nao_suportados():
+    """Mensal e sub-horário são REJEITADOS com erro claro (nunca rebaixados).
+
+    Regressão da auditoria 2026-06-22: 'P01M' caía no endpoint diário e o
+    reindex mensal mantinha só o valor do dia 1º rotulado como o mês inteiro;
+    '1 min'/'15 min' caíam para horário e viravam série ~98% vazia.
+    """
+    import pytest
+
+    fonte = NasaPower()
+    for passo in ("P01M", "PT01M", "PT15M"):
+        with pytest.raises(ValueError, match="NASA POWER"):
+            fonte.buscar(BOTUCATU, date(2024, 1, 1), date(2024, 1, 31), passo)
+
+
+def test_passo_mensal_fora_da_interface():
+    """'1 mês' saiu das opções da UI até o suporte mensal ser reprojetado."""
+    from core.config import PASSOS_TEMPORAIS
+
+    assert "P01M" not in PASSOS_TEMPORAIS.values()
+    assert set(PASSOS_TEMPORAIS.values()) == {"PT01M", "PT15M", "PT01H", "P01D"}

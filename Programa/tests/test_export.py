@@ -125,6 +125,11 @@ def test_aba_graficos(tmp_path):
     assert g["A5"].value == "=DATE(2026,1,1)"
     # SUMPRODUCT que soma por dia a partir do TEXTO do período.
     assert "SUMPRODUCT" in g["B5"].value and "GHI (W/m²)" in g["B5"].value
+    # Regressão (auditoria 2026-06-22): o token de ano em TEXT() tem de ser o
+    # canônico "yyyy" — o .xlsx guarda fórmulas na forma invariante en-US e
+    # "aaaa" (código de EXIBIÇÃO pt-BR) zeraria a soma diária ao abrir.
+    assert 'TEXT($A5,"dd/mm/yyyy")' in g["B5"].value
+    assert "aaaa" not in g["B5"].value
     # Energia média diária por componente referencia o Resumo.
     assert g["A10"].value == "Energia média diária por componente (kWh/m²/dia)"
     assert g["A12"].value == "=Resumo!A17"

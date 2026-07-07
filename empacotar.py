@@ -382,9 +382,16 @@ def versao_do_repo() -> str:
 
 
 def zipar(pkg: Path, versao: str, alvo_nome: str) -> tuple[Path, Path]:
-    """Gera o zip COMPLETO (1º install) e o zip SÓ-CÓDIGO (update leve)."""
+    """Gera o zip COMPLETO (1º install) e o zip SÓ-CÓDIGO (update leve).
+
+    O zip completo tem o CONTEÚDO do pacote na RAIZ (python/, Programa/ e o
+    launcher lado a lado) — mesma estrutura do artefato do CI, que foi a
+    validada em campo. NÃO reintroduzir uma pasta de topo: o nível extra
+    aprofunda os caminhos no Windows (limite MAX_PATH de 260) e faz o usuário
+    extrair em C:\\PIRAXIS e cair em C:\\PIRAXIS\\PIRAXIS\\.
+    """
     completo = DIST / f"PIRAXIS-{versao}-{alvo_nome}"
-    shutil.make_archive(str(completo), "zip", root_dir=str(DIST), base_dir="PIRAXIS")
+    shutil.make_archive(str(completo), "zip", root_dir=str(pkg))
 
     # Só-código: zip de Programa/ sem python/.
     tmp = DIST / "_codigo"

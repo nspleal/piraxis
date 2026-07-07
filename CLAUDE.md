@@ -99,6 +99,27 @@ Projeto acadêmico da UNESP; local padrão **Botucatu/SP** (−22.8867, −48.44
   máquina do laboratório do pesquisador. (Não consegui baixar/inspecionar o artefato aqui — Azure blob
   fora do allowlist de egress — mas a confirmação veio do **uso real**.) ⚠️ O artefato é só do build #2
   em diante; o build #1 (zip-dentro-de-zip) é o defeituoso — não usar.
+- **✅ AUDITORIA COMPLETA + HOTFIXES (2026-06-22):** varredura incisiva de todo o código (3 frentes)
+  achou e corrigiu: (1) **NASA "1 mês" devolvia o valor do dia 1º rotulado como o mês** (endpoint
+  diário + grade MS) → `NasaPower.buscar` agora **rejeita** passos não suportados (só PT01H/P01D),
+  nunca rebaixa em silêncio (1 min/15 min viravam série ~98% NaN); (2) **"1 mês" REMOVIDO da UI**
+  (`PASSOS_TEMPORAIS`): a pvlib rotula o mensal no **último dia do mês** e a grade usa o início — o
+  CAMS mensal ficava 100% vazio. Reativar só com grade/rótulo alinhados + agregação NASA + `n_dias`
+  do Excel; (3) **fórmula do Excel usava `TEXT(...,"dd/mm/aaaa")`** (token de exibição pt-BR) → trocado
+  pelo canônico **`yyyy`** (o .xlsx guarda fórmulas en-US; "aaaa" zerava a energia diária); (4) **zip
+  do build agora tem o CONTEÚDO na raiz** (igual ao artefato validado em campo) — antes a Release
+  aninhava `PIRAXIS\PIRAXIS\` e re-arriscava o MAX_PATH; (5) workflow: **`--locked` por padrão**
+  (build reprodutível; input "Atualizar dependências" re-resolve e publica o lock novo como artefato),
+  **Release atualizada sem apagar antes** (upload --clobber + edit + tag rolante movida; sem janela de
+  404), **`include-hidden-files: true`** (o v4 excluía `.streamlit/` do artefato — tema escuro!) e
+  **`concurrency`** (builds simultâneos não se corrompem). Testes: **49/49** (2 regressões novas).
+  ⚠️ **Pendências da auditoria (fila):** e-mail SoDa impresso na aba Resumo do Excel (contradiz a
+  política do módulo de reprodutibilidade); conferência quebra com extração combinada (colunas
+  duplicadas) e dá "Idêntico" falso quando o site ≈ 0; NASA sem validação de lag de datas; estado do
+  app persiste após falha parcial; `pytest`/`responses` embarcados no pacote (mover p/ dev);
+  `CACHE_HABILITADO` é config morta; kt sem teto no crepúsculo; `n_dias` mensal do Excel (~9% off,
+  dormente com a UI sem mensal); verificação SHA do runtime é best-effort; sem CI de testes em
+  push/PR; sem README/LICENSE (relevante p/ INPI).
 - **🎯 PRINCÍPIO DE FIDELIDADE (travado 2026-06-21):** toda extração deve sair **idêntica à sua
   fonte** — CAMS McClear no formato do CAMS; NASA POWER no formato da NASA. Hoje o Excel está fiel ao
   **CAMS** (período em faixa início–fim UTC, altitude do ponto, 4 casas decimais). ⚠️ **Ao trabalhar a

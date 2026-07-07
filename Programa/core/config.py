@@ -155,12 +155,17 @@ ORDEM_CASCATA: tuple[str, ...] = ("TOA", "GHI", "DHI", "BHI", "DNI")
 # Passos temporais suportados
 # ---------------------------------------------------------------------------
 # Mapeia rótulos amigáveis para os códigos ISO 8601 usados pelas APIs.
+# ⚠️ "1 mês" (P01M) foi REMOVIDO da interface (auditoria 2026-06-22): a pvlib
+# rotula o dado mensal no ÚLTIMO dia do mês, enquanto a grade temporal do
+# projeto usa o INÍCIO do mês — o reindex descartava tudo (CAMS ficava 100%
+# vazio) e a NASA (endpoint diário) devolvia só o dia 1º rotulado como o mês.
+# Reative apenas junto com: grade/rótulo mensal alinhados, agregação real da
+# NASA e n_dias correto no Excel.
 PASSOS_TEMPORAIS: dict[str, str] = {
     "1 minuto": "PT01M",
     "15 minutos": "PT15M",
     "1 hora": "PT01H",
     "1 dia": "P01D",
-    "1 mês": "P01M",
 }
 
 
