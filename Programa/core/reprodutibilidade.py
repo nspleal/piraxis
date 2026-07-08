@@ -27,8 +27,12 @@ from pathlib import Path
 
 import pandas as pd
 
+from core.versao import versao_ferramenta
+
 NOME_FERRAMENTA = "PIRAXIS — extrator de radiação solar (UNESP)"
-VERSAO_FERRAMENTA = "1.0"
+# Versão DINÂMICA (VERSAO.txt do pacote > commit git > "dev") — a proveniência
+# amarra cada extração à versão exata do código, não a um "1.0" fixo.
+VERSAO_FERRAMENTA = versao_ferramenta()
 
 # ---------------------------------------------------------------------------
 # Textos de citação VERIFICADOS (não editar sem conferência bibliográfica)

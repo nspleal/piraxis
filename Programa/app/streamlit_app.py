@@ -1285,9 +1285,12 @@ with aba_dados:
 # ---------------------------------------------------------------------------
 # Rodapé
 # ---------------------------------------------------------------------------
+from core.versao import versao_ferramenta as _versao_ferramenta
+
 st.markdown(
     f"<div style='margin-top:28px;padding-top:14px;border-top:0.5px solid {BORDA};"
-    f"font-size:11px;color:{TXT3}'>PIRAXIS · extrator de radiação solar · "
+    f"font-size:11px;color:{TXT3}'>PIRAXIS {_versao_ferramenta()} · "
+    "extrator de radiação solar · "
     f"Ferramenta acadêmica da UNESP · {date.today().year} · horários em UTC</div>",
     unsafe_allow_html=True,
 )
