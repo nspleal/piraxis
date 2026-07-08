@@ -88,12 +88,15 @@ def test_resumo_estatisticas_em_a16(tmp_path):
     assert r["A1"].value == "PIRAXIS — Relatório de Radiação Solar"
     assert r["A2"].value == '=B4&" • "&B8'
     assert r["A3"].value == "Informações Gerais"
-    rotulos = [r.cell(row=i, column=1).value for i in range(4, 12)]
+    rotulos = [r.cell(row=i, column=1).value for i in range(4, 13)]
     assert rotulos == [
         "Local", "Latitude", "Longitude", "Altitude (m)", "Período",
-        "Fontes usadas", "Passo temporal", "Data de geração",
+        "Fontes usadas", "Passo temporal", "Versão da ferramenta",
+        "Data de geração",
     ]
-    assert r["B11"].number_format == "@"
+    assert r["B12"].number_format == "@"
+    # Versão dinâmica preenchida (VERSAO.txt > git > "dev"), nunca vazia.
+    assert r["B11"].value and str(r["B11"].value) != "1.0"
     # Regressão (auditoria 2026-06-22): o e-mail SoDa é credencial pessoal e
     # NÃO entra no Excel — mesmo que venha nos metadados, o exportador ignora.
     valores_resumo = [
@@ -258,3 +261,51 @@ def test_passo_diario_usa_unidade_wh(tmp_path):
     wb = load_workbook(caminho)
     assert wb["Dados"]["B1"].value == "GHI (Wh/m²)"
     assert wb["Resumo"]["G17"].value == "=F17/10/1000"  # 10 dias
+
+
+def test_extracao_so_nasa_usa_instante_unico():
+    """Fidelidade à fonte (princípio travado): a NASA POWER rotula a HORA
+    (YYYYMMDDHH), não um intervalo início–fim como o CAMS. Extração só-NASA
+    sai com coluna "Data/Hora (UTC)" e instante único; o SUMPRODUCT da
+    energia diária referencia o nome novo e continua somando (os 10 primeiros
+    caracteres seguem sendo a data)."""
+    ts = pd.date_range("2026-01-01", periods=48, freq="h")
+    df = pd.DataFrame(
+        {
+            "timestamp": ts,
+            "GHI": [100.0] * 48,
+            "DNI": [80.0] * 48,
+            "DHI": [30.0] * 48,
+        }
+    )
+    meta = dict(_metadados())
+    meta["fontes"] = "NASA POWER"
+
+    caminho = _caminho = None
+    import tempfile, os
+    with tempfile.TemporaryDirectory() as tmp:
+        caminho = os.path.join(tmp, "nasa.xlsx")
+        exporta(df, meta, caminho)
+        wb = load_workbook(caminho)
+
+        ws = wb["Dados"]
+        assert ws["A1"].value == "Data/Hora (UTC)"
+        assert ws["A2"].value == "01/01/2026 00:00"   # instante único, sem "–"
+        assert "–" not in str(ws["A2"].value)
+
+        g = wb["Gráficos"]
+        assert 'TabDados[Data/Hora (UTC)]' in g["B5"].value
+        assert 'TEXT($A5,"dd/mm/yyyy")' in g["B5"].value
+
+
+def test_extracao_cams_mantem_faixa_inicio_fim():
+    """Com o CAMS presente (só-CAMS ou combinado), a 1ª coluna continua sendo
+    o PERÍODO em faixa início–fim, fiel ao 'Observation period' do site."""
+    caminho_dir = None
+    import tempfile, os
+    with tempfile.TemporaryDirectory() as tmp:
+        caminho = os.path.join(tmp, "cams.xlsx")
+        exporta(_df_uma_fonte(), _metadados(), caminho)
+        ws = load_workbook(caminho)["Dados"]
+        assert ws["A1"].value == "Período (UTC)"
+        assert "–" in str(ws["A2"].value)

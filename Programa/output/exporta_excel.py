@@ -64,6 +64,7 @@ from openpyxl.worksheet.table import Table, TableStyleInfo
 from openpyxl.worksheet.worksheet import Worksheet
 
 from core.config import OUTPUT_DIR
+from core.versao import versao_ferramenta as _versao_ferramenta
 
 logger = logging.getLogger(__name__)
 
@@ -159,6 +160,23 @@ def _rotulo_periodo(ts_inicio, passo: str) -> str | None:
     return f"{ini.strftime('%d/%m/%Y %H:%M')}–{fim.strftime('%d/%m/%Y %H:%M')}"
 
 
+def _rotulo_instante(ts, passo: str) -> str | None:
+    """Texto do INSTANTE (UTC) de um valor, espelhando a convenção da NASA
+    POWER (a NASA rotula a HORA — YYYYMMDDHH — e o DIA — YYYYMMDD; não um
+    intervalo início–fim como o CAMS). Ex. (horário): '01/01/2026 08:00'.
+
+    Fidelidade à fonte: extração SÓ-NASA sai no formato da NASA. Os 10
+    primeiros caracteres continuam sendo a data (dd/mm/yyyy), então a soma
+    de energia diária por SUMPRODUCT/LEFT(...,10) funciona igual.
+    """
+    if ts is None or pd.isna(ts):
+        return None
+    t = pd.Timestamp(ts)
+    if passo in ("1d", "1M"):
+        return t.strftime("%d/%m/%Y") if passo == "1d" else t.strftime("%m/%Y")
+    return t.strftime("%d/%m/%Y %H:%M")
+
+
 # ---------------------------------------------------------------------------
 # Função principal
 # ---------------------------------------------------------------------------
@@ -210,11 +228,23 @@ def exporta(
             fim = fim + pd.offsets.MonthEnd(0)
         n_dias = max(1, (fim - ts.min().normalize()).days + 1)
 
+    # FIDELIDADE À FONTE: extração SÓ-NASA usa a convenção da NASA POWER
+    # (instante único, "Data/Hora"); com o CAMS presente, a faixa início–fim
+    # do site da SoDa. O formato da extração COMBINADA está "a definir" no
+    # projeto — até lá, o combinado segue o formato CAMS.
+    fontes_meta = str(metadados.get("fontes", "")).lower()
+    modo_nasa = (
+        ("nasa" in fontes_meta or "power" in fontes_meta)
+        and not ("mcclear" in fontes_meta or "cams" in fontes_meta)
+    )
+    rotulo_tempo = "Data/Hora (UTC)" if modo_nasa else "Período (UTC)"
+
     wb = Workbook()
     aba_dados = wb.active
     aba_dados.title = "Dados"
     rotulos = _escrever_dados(
-        aba_dados, df, colunas_numericas, componentes, unidade, passo, n_dias
+        aba_dados, df, colunas_numericas, componentes, unidade, passo, n_dias,
+        rotulo_tempo=rotulo_tempo, modo_nasa=modo_nasa,
     )
 
     aba_resumo = wb.create_sheet("Resumo", index=0)
@@ -233,7 +263,7 @@ def exporta(
     aba_graficos = wb.create_sheet("Gráficos", index=1)
     _escrever_graficos(
         aba_graficos, aba_dados, df, colunas_numericas, componentes,
-        unidade, passo, n_dias, rotulos,
+        unidade, passo, n_dias, rotulos, rotulo_tempo=rotulo_tempo,
     )
 
     # Abas novas (QC e reprodutibilidade), sem tocar nas existentes.
@@ -261,11 +291,16 @@ def _escrever_dados(
     unidade: str,
     passo: str,
     n_dias: int,
+    rotulo_tempo: str = "Período (UTC)",
+    modo_nasa: bool = False,
 ) -> dict[str, str]:
-    """Escreve a TabDados (coluna de PERÍODO início–fim, igual ao site) e o
-    gráfico de radiação ao longo do tempo."""
+    """Escreve a TabDados e o gráfico de radiação ao longo do tempo.
+
+    Primeira coluna fiel à fonte: faixa início–fim (CAMS/site da SoDa) ou
+    instante único (NASA POWER), conforme ``modo_nasa``.
+    """
     rotulos = {c: _rotulo_coluna(c, unidade) for c in colunas_numericas}
-    cabecalho = ["Período (UTC)"] + [rotulos[c] for c in colunas_numericas]
+    cabecalho = [rotulo_tempo] + [rotulos[c] for c in colunas_numericas]
     n_linhas = len(df)
 
     # --- Cabeçalho (branco/negrito sobre azul, centralizado) ----------------
@@ -278,7 +313,10 @@ def _escrever_dados(
     # --- Linhas de dados (NaN -> célula vazia, nunca zero inventado) --------
     for i, (_, linha) in enumerate(df.iterrows(), start=2):
         cel = ws.cell(row=i, column=1)
-        cel.value = _rotulo_periodo(linha.get("timestamp"), passo)
+        cel.value = (
+            _rotulo_instante(linha.get("timestamp"), passo) if modo_nasa
+            else _rotulo_periodo(linha.get("timestamp"), passo)
+        )
         cel.number_format = "@"
         cel.alignment = Alignment(horizontal="left")
         cel.font = _fonte_normal
@@ -399,6 +437,9 @@ def _escrever_resumo(
         ("Período", metadados.get("periodo", "")),
         ("Fontes usadas", metadados.get("fontes", "")),
         ("Passo temporal", metadados.get("passo_temporal", "")),
+        # Rastreabilidade: a versão exata da ferramenta que gerou a planilha
+        # (VERSAO.txt do pacote > commit git > "dev") — relevante p/ INPI.
+        ("Versão da ferramenta", _versao_ferramenta()),
         # O e-mail SoDa é credencial PESSOAL e não entra em nenhuma saída
         # compartilhável (mesma política do módulo de reprodutibilidade).
         (
@@ -526,10 +567,12 @@ def _escrever_graficos(
     passo: str,
     n_dias: int,
     rotulos: dict[str, str],
+    rotulo_tempo: str = "Período (UTC)",
 ) -> None:
-    """Aba 'Gráficos': perfil temporal de irradiância + tabela de energia diária
-    por dia (via SUMPRODUCT sobre o texto do período) + energia média diária por
-    componente, com três gráficos. Genérica para os componentes presentes.
+    """Aba 'Gráficos': perfil temporal de irradiação + tabela de energia diária
+    por dia (via SUMPRODUCT sobre o texto da 1ª coluna — faixa CAMS ou instante
+    NASA, os 10 primeiros caracteres são sempre a data) + energia média diária
+    por componente, com três gráficos. Genérica para os componentes presentes.
     """
     n_linhas = len(df)
     ws.column_dimensions["A"].width = 15.3
@@ -587,7 +630,7 @@ def _escrever_graficos(
                 # .xlsx armazena fórmulas na forma invariante en-US; o Excel
                 # pt-BR traduz sozinho na exibição). "aaaa" quebraria a soma.
                 cel.value = (
-                    '=SUMPRODUCT(--(LEFT(TabDados[Período (UTC)],10)'
+                    f'=SUMPRODUCT(--(LEFT(TabDados[{rotulo_tempo}],10)'
                     f'=TEXT($A{r},"dd/mm/yyyy")),TabDados[{rot}])/1000'
                 )
                 cel.number_format = "0.00"

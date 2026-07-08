@@ -161,17 +161,26 @@ Projeto acadêmico da UNESP; local padrão **Botucatu/SP** (−22.8867, −48.44
   API antiga sai do Streamlit após 2025-12-31); rótulos: "Série temporal — irradiação (passo de X)",
   eixo "Tempo (UTC)", "Irradiação (Wh/m²)".
   ⚠️ **Fila restante (miúda):** `n_dias` mensal do Excel (~9% off, dormente com a UI sem mensal);
-  verificação SHA do runtime é best-effort; `VERSAO_FERRAMENTA` estática ("1.0") na proveniência;
-  cache órfão nunca é limpo; detecção de CSV pt-BR tem janela cega < 100 Wh/m²; NASA achata 4xx/429
+  verificação SHA do runtime é best-effort; cache órfão nunca é limpo; detecção de CSV pt-BR tem janela cega < 100 Wh/m²; NASA achata 4xx/429
   em "verifique sua conexão"; `resposta_crua` vazia em cache hit (auditoria silenciosamente vazia);
   porta fixa 8599 na validação do build; `manifesto.json`/zip só-código gerados sem consumidor;
-  sem README/LICENSE (relevante p/ INPI).
+  LICENSE formal pendente da decisão de IP/INPI (README raiz já existe).
 - **🎯 PRINCÍPIO DE FIDELIDADE (travado 2026-06-21):** toda extração deve sair **idêntica à sua
-  fonte** — CAMS McClear no formato do CAMS; NASA POWER no formato da NASA. Hoje o Excel está fiel ao
-  **CAMS** (período em faixa início–fim UTC, altitude do ponto, 4 casas decimais). ⚠️ **Ao trabalhar a
-  NASA:** revisar o formato para casar com a NASA POWER — provavelmente **timestamp instantâneo único**
-  (a NASA rotula a hora, não um intervalo início–fim), além de conferir unidades/colunas/decimais. Em
-  extração **combinada** (as duas fontes) será preciso decidir qual formato usar (a definir).
+  fonte** — CAMS McClear no formato do CAMS; NASA POWER no formato da NASA. Excel fiel ao **CAMS**
+  (período em faixa início–fim UTC, altitude do ponto, 4 casas decimais).
+  ✅ **FORMATO NASA NO EXCEL — FEITO (2026-07-08):** extração **só-NASA** sai na convenção da NASA
+  POWER: coluna **"Data/Hora (UTC)"** com **timestamp instantâneo único** (`_rotulo_instante`; a NASA
+  rotula a hora YYYYMMDDHH e o dia YYYYMMDD, não um intervalo). O SUMPRODUCT da energia diária usa o
+  nome dinâmico da coluna (LEFT(...,10) continua sendo a data). Unidades já conferidas (RE horário =
+  Wh/m²; diário kWh→Wh ×1000). ⚠️ **Extração COMBINADA continua no formato CAMS** — qual formato usar
+  no combinado segue **a definir** (decisão do pesquisador). ⚠️ Falta o teste empírico de alinhamento
+  CAMS×NASA com rede real (kt ~0,95–1,05 ao meio-dia em dia limpo, picos coincidentes).
+- **✅ VERSÃO DINÂMICA + README RAIZ (2026-07-08):** novo `core/versao.py` — precedência
+  `Programa/VERSAO.txt` (gravado pelo empacotador no pacote) > commit git (`dev-<sha>`) > `"dev"`.
+  Usada na **proveniência** (`VERSAO_FERRAMENTA`, antes "1.0" fixo), no **rodapé do app** e em nova
+  linha **"Versão da ferramenta"** no Resumo do Excel (rastreabilidade p/ INPI). **README.md na raiz**
+  do repo (visão, download da Release, dev quickstart, aviso "todos os direitos reservados — INPI em
+  definição"; LICENSE formal aguarda a decisão de IP).
 - **✅ TOA incluído (fidelidade CAMS):** a extração do CAMS traz a coluna **TOA** (irradiação no topo
   da atmosfera = extraterrestre; `ghi_extra` da pvlib), como o arquivo do site. Ordem: **TOA, GHI, BHI,
   DHI, DNI**. Cache `CACHE_SCHEMA` = **5**.
