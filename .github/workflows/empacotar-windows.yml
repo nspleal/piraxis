@@ -78,24 +78,33 @@ jobs:
           ZIP_BUILD="$(ls dist/PIRAXIS-*-windows-x64.zip | head -n1)"
           cp "$ZIP_BUILD" "dist/PIRAXIS-windows-x64.zip"
 
+          # Soma de verificação publicada junto (integridade verificável do
+          # download — rastreabilidade p/ INPI). Conferir no Windows com:
+          #   certutil -hashfile PIRAXIS-windows-x64.zip SHA256
+          (cd dist && sha256sum PIRAXIS-windows-x64.zip > SHA256SUMS.txt)
+          cat dist/SHA256SUMS.txt
+
           SHA_SHORT="${GITHUB_SHA::7}"
-          printf '%s\n\n%s\n\n%s\n' \
+          printf '%s\n\n%s\n\n%s\n\n%s\n' \
             "Pacote portátil do PIRAXIS para Windows — Python embutido, NÃO precisa instalar nada." \
             "Build automático do commit ${SHA_SHORT}." \
-            "Como usar: baixe PIRAXIS-windows-x64.zip, extraia em um caminho CURTO (exemplo: C:\\PIRAXIS) e dê dois cliques em INICIAR PIRAXIS.bat." \
+            "Como usar: baixe PIRAXIS-windows-x64.zip, extraia em um caminho CURTO (exemplo: C:\\PIRAXIS) e dê dois cliques em INICIAR PIRAXIS.bat. Em caso de dúvida, rode VERIFICAR INSTALACAO.bat (autoteste offline)." \
+            "Integridade: confira o SHA256 do zip contra o SHA256SUMS.txt (no Windows: certutil -hashfile PIRAXIS-windows-x64.zip SHA256)." \
             > dist/release-notes.md
 
           TITULO="PIRAXIS — pacote Windows (mais recente)"
           if gh release view pacote-windows >/dev/null 2>&1; then
             # ATUALIZA a Release existente — sem apagar antes, sem janela de 404.
-            gh release upload pacote-windows "dist/PIRAXIS-windows-x64.zip" --clobber
+            gh release upload pacote-windows \
+              "dist/PIRAXIS-windows-x64.zip" "dist/SHA256SUMS.txt" --clobber
             gh release edit pacote-windows --title "$TITULO" \
               --notes-file dist/release-notes.md --latest
             # Move a tag ROLANTE para o commit atual (ponteiro de release, não
             # reescrita de histórico — é o padrão de "rolling release").
             git push --force origin "HEAD:refs/tags/pacote-windows"
           else
-            gh release create pacote-windows "dist/PIRAXIS-windows-x64.zip" \
+            gh release create pacote-windows \
+              "dist/PIRAXIS-windows-x64.zip" "dist/SHA256SUMS.txt" \
               --title "$TITULO" \
               --notes-file dist/release-notes.md \
               --latest \

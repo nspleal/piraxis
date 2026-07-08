@@ -59,6 +59,7 @@ from core.config import (
 from core.qualidade import analisar_qualidade
 from core.reprodutibilidade import gerar_reprodutibilidade
 from output.exporta_excel import exporta, nome_arquivo_saida
+from sources import base as base_fontes
 from sources.cams_mcclear import ATRASO_DIAS, CamsMcClear
 from sources.nasa_power import NasaPower
 
@@ -698,6 +699,17 @@ with st.sidebar:
         "Extrair dados", type="primary", width="stretch"
     )
 
+    # --- Cache local (regenerável; sem isto crescia para sempre) -----------
+    st.markdown("### Cache")
+    _mb_cache = base_fontes.tamanho_cache_bytes() / 1e6
+    st.caption(
+        f"Respostas guardadas localmente: **{_mb_cache:.1f} MB**. "
+        "Re-extrair o mesmo período não chama a API."
+    )
+    if st.button("🧹 Limpar cache", width="stretch"):
+        n_rem = base_fontes.limpar_cache()
+        st.success(f"Cache limpo ({n_rem} arquivo(s) removido(s)).")
+
 
 # ---------------------------------------------------------------------------
 # Cabeçalho institucional (usa os valores da barra lateral)
@@ -1180,8 +1192,8 @@ with aba_conf:
         if brutos:
             st.markdown("**Auditoria — respostas cruas da fonte**")
             st.caption(
-                "Exatamente o que a fonte devolveu nesta extração, antes do "
-                "processamento. Fica vazio quando a extração veio do cache."
+                "Exatamente o que a fonte devolveu, antes do processamento — "
+                "também disponível quando a extração veio do cache."
             )
             import json as _json_audit
 
