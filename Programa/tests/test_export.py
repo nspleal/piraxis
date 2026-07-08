@@ -309,3 +309,17 @@ def test_extracao_cams_mantem_faixa_inicio_fim():
         ws = load_workbook(caminho)["Dados"]
         assert ws["A1"].value == "Período (UTC)"
         assert "–" in str(ws["A2"].value)
+
+
+def test_n_dias_mensal_conta_do_dia_1_ao_fim_do_mes(tmp_path):
+    """Regressão (fila da auditoria): a pvlib rotula o mensal no ÚLTIMO dia
+    do mês; usar o rótulo cru como início subcontava ~9% (12 meses ~ 335
+    dias) e superestimava o kWh/m²/dia. Dormente (UI sem mensal), mas o
+    divisor agora está correto para quando o mensal voltar."""
+    ts = pd.date_range("2026-01-01", periods=12, freq="ME")  # fins de mês
+    df = pd.DataFrame({"timestamp": ts, "GHI": [150000.0] * 12})
+    caminho = tmp_path / "mensal.xlsx"
+    exporta(df, _metadados(), caminho)
+
+    r = load_workbook(caminho)["Resumo"]
+    assert r["G17"].value == "=F17/365/1000"  # 2026: 365 dias, não ~335

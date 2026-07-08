@@ -160,10 +160,21 @@ Projeto acadêmico da UNESP; local padrão **Botucatu/SP** (−22.8867, −48.44
   compartilhadas voltam à versão pinada); (h) **`use_container_width` → `width="stretch"`** (10×;
   API antiga sai do Streamlit após 2025-12-31); rótulos: "Série temporal — irradiação (passo de X)",
   eixo "Tempo (UTC)", "Irradiação (Wh/m²)".
-  ⚠️ **Fila restante (miúda):** `n_dias` mensal do Excel (~9% off, dormente com a UI sem mensal);
-  verificação SHA do runtime é best-effort; cache órfão nunca é limpo; detecção de CSV pt-BR tem janela cega < 100 Wh/m²; NASA achata 4xx/429
-  em "verifique sua conexão"; `resposta_crua` vazia em cache hit (auditoria silenciosamente vazia);
-  porta fixa 8599 na validação do build; `manifesto.json`/zip só-código gerados sem consumidor;
+  ✅ **RODADA DE ROBUSTEZ FINAL (2026-07-08, testes 72/72 + validar_app APROVADO):** (a) **resposta
+  crua persistida no cache** (`_salvar_cru`/`_ler_cru` em `sources/base.py`: NASA→.cru.json,
+  CAMS→.cru.csv) — cache hit não deixa mais o download de auditoria vazio; (b) **erros HTTP da NASA
+  com mensagens distintas** (429 "limitou temporariamente" / 4xx "recusou a consulta" / 5xx
+  "indisponível" — antes tudo era "verifique sua conexão"); (c) **gestão de cache no app** (seção
+  Cache na sidebar: tamanho em MB + botão Limpar; `tamanho_cache_bytes`/`limpar_cache` em base.py —
+  remove inclusive órfãos de CACHE_SCHEMA antigos); (d) **`n_dias` mensal correto** no Excel (dia 1º
+  do 1º mês → fim do último; a pvlib rotula no fim do mês — dormente, mas pronto p/ o mensal voltar);
+  (e) **build**: porta dinâmica na validação de boot (era fixa 8599), verificação SHA do runtime
+  **fail-loud** (com fallback ao .sha256 cacheado), `manifesto.json`/zip só-código só com
+  `--com-updater` (padrão: não gera artefato sem consumidor); (f) **`SHA256SUMS.txt` publicado na
+  Release** (conferir no Windows: `certutil -hashfile ... SHA256`); (g) **`VERIFICAR INSTALACAO.bat`**
+  no pacote + `Programa/autoteste.py` (autoteste offline: stdlib íntegra/deps/módulos, com dica do
+  MAX_PATH — suporte de laboratório sem chamar o desenvolvedor).
+  ⚠️ **Fila restante (mínima):** detecção de CSV pt-BR tem janela cega < 100 Wh/m²;
   LICENSE formal pendente da decisão de IP/INPI (README raiz já existe).
 - **🎯 PRINCÍPIO DE FIDELIDADE (travado 2026-06-21):** toda extração deve sair **idêntica à sua
   fonte** — CAMS McClear no formato do CAMS; NASA POWER no formato da NASA. Excel fiel ao **CAMS**

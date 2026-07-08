@@ -19,6 +19,7 @@ Inclui também utilidades de cache local compartilhadas pelas fontes concretas.
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 from abc import ABC, abstractmethod
 from datetime import date
@@ -29,6 +30,33 @@ import pandas as pd
 from core.config import CACHE_DIR, Config
 
 logger = logging.getLogger(__name__)
+
+
+def tamanho_cache_bytes() -> int:
+    """Tamanho total (bytes) dos arquivos de cache no disco."""
+    if not CACHE_DIR.exists():
+        return 0
+    return sum(p.stat().st_size for p in CACHE_DIR.glob("*") if p.is_file())
+
+
+def limpar_cache() -> int:
+    """Apaga todos os arquivos de cache (dados e respostas cruas).
+
+    O cache é 100% regenerável (re-extrair refaz tudo); sem isto ele crescia
+    para sempre — inclusive arquivos órfãos de versões antigas do CACHE_SCHEMA,
+    que nunca mais seriam lidos. Retorna o número de arquivos removidos.
+    """
+    if not CACHE_DIR.exists():
+        return 0
+    removidos = 0
+    for p in CACHE_DIR.glob("*"):
+        if p.is_file():
+            try:
+                p.unlink()
+                removidos += 1
+            except OSError as exc:  # pragma: no cover - arquivo em uso etc.
+                logger.warning("Não consegui remover %s: %s", p, exc)
+    return removidos
 
 # Nomes padronizados das colunas de componentes, NA ORDEM do arquivo do site da
 # SoDa/CAMS McClear (TOA, GHI, BHI, DHI, BNI), para facilitar a conferência coluna
@@ -136,6 +164,49 @@ class FonteRadiacao(ABC):
         caminho = self._caminho_cache(chave)
         df.to_csv(caminho, index=False)
         logger.info("[%s] Resposta salva no cache: %s", self.nome, caminho.name)
+
+    # ------------------------------------------------------------------
+    # Resposta CRUA (auditoria) — persistida junto do cache para que um
+    # cache hit não deixe o download de auditoria silenciosamente vazio.
+    # ------------------------------------------------------------------
+    def _caminho_cru(self, chave: str, formato: str) -> Path:
+        return CACHE_DIR / f"{chave}.cru.{formato}"
+
+    def _salvar_cru(self, chave: str, conteudo) -> None:
+        """Persiste a resposta crua (dict -> .json; DataFrame -> .csv).
+
+        Best-effort: falha aqui nunca derruba a extração (o cru é auditoria,
+        não dado).
+        """
+        if conteudo is None or not Config().cache_habilitado:
+            return
+        try:
+            if isinstance(conteudo, pd.DataFrame):
+                conteudo.to_csv(self._caminho_cru(chave, "csv"))
+            else:
+                self._caminho_cru(chave, "json").write_text(
+                    json.dumps(conteudo, ensure_ascii=False), encoding="utf-8"
+                )
+        except Exception as exc:  # pragma: no cover - só log, nunca quebra
+            logger.warning("[%s] Não persisti a resposta crua: %s", self.nome, exc)
+
+    def _ler_cru(self, chave: str):
+        """Recupera a resposta crua do cache (ou None se não houver)."""
+        if not Config().cache_habilitado:
+            return None
+        caminho_json = self._caminho_cru(chave, "json")
+        if caminho_json.exists():
+            try:
+                return json.loads(caminho_json.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                return None
+        caminho_csv = self._caminho_cru(chave, "csv")
+        if caminho_csv.exists():
+            try:
+                return pd.read_csv(caminho_csv, index_col=0)
+            except Exception:  # noqa: BLE001 - cru ilegível = ausente
+                return None
+        return None
 
     @staticmethod
     def _padronizar_colunas(df: pd.DataFrame) -> pd.DataFrame:

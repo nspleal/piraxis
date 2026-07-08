@@ -37,6 +37,10 @@ PASSO A PASSO
    programa abre sozinho no seu navegador. Para fechar o
    programa, feche aquela janela preta.
 
+ALGO DEU ERRADO? Dê dois cliques em VERIFICAR INSTALACAO.bat:
+   é um autoteste de segundos (sem internet) que diz se a
+   instalação está íntegra e o que fazer se não estiver.
+
 --------------------------------------------------------------
 PRIMEIRA VEZ NO MAC (aviso de segurança "Gatekeeper")
 --------------------------------------------------------------

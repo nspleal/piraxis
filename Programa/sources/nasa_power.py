@@ -117,10 +117,12 @@ class NasaPower(FonteRadiacao):
                 f"{limite:%d/%m/%Y}. Ajuste o período e tente de novo."
             )
 
-        # Cache primeiro: mesma consulta nunca rebate na API.
+        # Cache primeiro: mesma consulta nunca rebate na API. A resposta CRUA
+        # persistida acompanha (o download de auditoria não fica vazio).
         chave = self._chave_cache(local, data_inicio, data_fim, passo_temporal)
         em_cache = self._ler_cache(chave)
         if em_cache is not None:
+            self.resposta_crua = self._ler_cru(chave)
             return em_cache
 
         diario = passo_temporal == "P01D"
@@ -149,6 +151,26 @@ class NasaPower(FonteRadiacao):
         try:
             resposta = requests.get(endpoint, params=parametros, timeout=self.timeout)
             resposta.raise_for_status()
+        except requests.HTTPError as exc:
+            # Erros HTTP têm causas distintas — não achatar tudo em "verifique
+            # sua conexão" (mensagem enganosa para 429/4xx).
+            status = exc.response.status_code if exc.response is not None else 0
+            if status == 429:
+                raise RuntimeError(
+                    "A NASA POWER limitou temporariamente as consultas "
+                    "(HTTP 429 — muitas requisições). Aguarde alguns minutos "
+                    "e tente novamente."
+                ) from exc
+            if 400 <= status < 500:
+                raise RuntimeError(
+                    f"A NASA POWER recusou a consulta (HTTP {status}). "
+                    "Verifique as coordenadas e o período escolhidos e tente "
+                    "novamente."
+                ) from exc
+            raise RuntimeError(
+                f"O serviço da NASA POWER parece indisponível no momento "
+                f"(HTTP {status}). Tente novamente mais tarde."
+            ) from exc
         except requests.RequestException as exc:
             raise RuntimeError(
                 f"Falha ao consultar a NASA POWER: {exc}. Verifique sua conexão "
@@ -162,6 +184,7 @@ class NasaPower(FonteRadiacao):
         df = self._reindexar_periodo(df, data_inicio, data_fim, passo_temporal)
         df = self._padronizar_colunas(df)
         self._salvar_cache(chave, df)
+        self._salvar_cru(chave, bruto)
         return df
 
     # ------------------------------------------------------------------

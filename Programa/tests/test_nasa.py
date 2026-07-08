@@ -241,3 +241,56 @@ def test_cache_pode_ser_desligado(monkeypatch):
     fonte.buscar(*args)  # sem cache -> segunda chamada de rede
 
     assert len(responses.calls) == 2
+
+
+@responses.activate
+def test_resposta_crua_disponivel_em_cache_hit():
+    """Regressão (fila da auditoria): em cache hit a resposta_crua ficava
+    None e o download de auditoria vinha silenciosamente vazio. Agora o cru
+    é persistido junto do cache e recuperado."""
+    responses.add(
+        responses.GET, ENDPOINT_HORARIO, json=_payload_horario(), status=200
+    )
+    args = (BOTUCATU, date(2024, 1, 1), date(2024, 1, 1), "PT01H")
+
+    NasaPower().buscar(*args)          # chamada real: grava dado + cru
+    fonte2 = NasaPower()
+    fonte2.buscar(*args)               # cache hit (sem rede)
+
+    assert len(responses.calls) == 1   # só a primeira bateu na API
+    assert fonte2.resposta_crua is not None
+    assert "properties" in fonte2.resposta_crua
+
+
+@responses.activate
+def test_erros_http_tem_mensagens_distintas():
+    """Regressão (fila da auditoria): todo erro HTTP virava "verifique sua
+    conexão" — enganoso para 429 (limite) e 4xx (consulta inválida)."""
+    import pytest
+
+    args = (BOTUCATU, date(2024, 2, 1), date(2024, 2, 1), "PT01H")
+
+    responses.add(responses.GET, ENDPOINT_HORARIO, status=429)
+    with pytest.raises(RuntimeError, match="limitou temporariamente"):
+        NasaPower().buscar(*args)
+
+    responses.reset()
+    responses.add(responses.GET, ENDPOINT_HORARIO, status=422)
+    with pytest.raises(RuntimeError, match="recusou a consulta"):
+        NasaPower().buscar(*args)
+
+    responses.reset()
+    responses.add(responses.GET, ENDPOINT_HORARIO, status=503)
+    with pytest.raises(RuntimeError, match="indisponível"):
+        NasaPower().buscar(*args)
+
+
+def test_limpar_cache_remove_dados_e_cru(tmp_path, monkeypatch):
+    from sources import base
+
+    monkeypatch.setattr(base, "CACHE_DIR", tmp_path)
+    (tmp_path / "abc.csv").write_text("x")
+    (tmp_path / "abc.cru.json").write_text("{}")
+    assert base.tamanho_cache_bytes() > 0
+    assert base.limpar_cache() == 2
+    assert base.tamanho_cache_bytes() == 0

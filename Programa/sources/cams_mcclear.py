@@ -163,6 +163,8 @@ class CamsMcClear(FonteRadiacao):
         )
         em_cache = self._ler_cache(chave)
         if em_cache is not None:
+            # Resposta crua persistida acompanha o cache (auditoria não vazia).
+            self.resposta_crua = self._ler_cru(chave)
             return em_cache
 
         # 4) Cache miss -> consulta real à API via pvlib.
@@ -173,6 +175,7 @@ class CamsMcClear(FonteRadiacao):
         df = self._reindexar_periodo(df, data_inicio, data_fim, passo_temporal)
         df = self._padronizar_colunas(df)
         self._salvar_cache(chave, df)
+        self._salvar_cru(chave, self.resposta_crua)
         return df
 
     # ------------------------------------------------------------------

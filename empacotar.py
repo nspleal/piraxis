@@ -90,8 +90,8 @@ ALVO_PADRAO = "windows-x64"
 # Camada de código copiada para o pacote (o que é o app). Pastas + arquivos.
 COPIAR_DIRS = ("app", "core", "sources", "output", ".streamlit")
 COPIAR_ARQS = (
-    "atualizar.py", ".env.example", "requirements.txt", "requirements.lock",
-    "LEIA-ME.txt",
+    "atualizar.py", "autoteste.py", ".env.example", "requirements.txt",
+    "requirements.lock", "LEIA-ME.txt",
 )
 # Nunca entram no pacote (runtime/efêmero/dev/segredos).
 EXCLUIR = {
@@ -170,21 +170,29 @@ def baixar_runtime(triple: str) -> Path:
         log.info("runtime em cache: %s", tgz.name)
 
     # Verificação de integridade contra o .sha256 publicado pela release.
+    # FALHA ALTO: seguir sem verificar anularia a própria checagem (um MITM
+    # que bloqueasse só o .sha256 desativaria a proteção em silêncio). Se a
+    # rede falhar agora mas o .sha256 já estiver cacheado de um build
+    # anterior, usamos o cacheado.
     esperado_path = CACHE / (asset + ".sha256")
     try:
         _baixar(url + ".sha256", esperado_path)
-        esperado = esperado_path.read_text().split()[0].strip().lower()
-        obtido = _sha256(tgz)
-        if obtido != esperado:
-            tgz.unlink(missing_ok=True)
+    except Exception as exc:
+        if not esperado_path.exists():
             raise RuntimeError(
-                f"SHA256 não confere para {asset}\n  esperado={esperado}\n  obtido={obtido}"
-            )
-        log.info("SHA256 OK (%s…)", obtido[:16])
-    except RuntimeError:
-        raise
-    except Exception as exc:  # rede instável no .sha256 não deve travar o cache
-        log.warning("não verifiquei o SHA256 (%s) — seguindo com o asset baixado", exc)
+                f"Não foi possível obter o SHA256 de {asset} ({exc}) e não há "
+                "cópia em cache — abortando por segurança (sem verificação de "
+                "integridade não há build)."
+            ) from exc
+        log.warning("usando .sha256 do cache (download falhou: %s)", exc)
+    esperado = esperado_path.read_text().split()[0].strip().lower()
+    obtido = _sha256(tgz)
+    if obtido != esperado:
+        tgz.unlink(missing_ok=True)
+        raise RuntimeError(
+            f"SHA256 não confere para {asset}\n  esperado={esperado}\n  obtido={obtido}"
+        )
+    log.info("SHA256 OK (%s…)", obtido[:16])
     return tgz
 
 
@@ -311,6 +319,19 @@ def gerar_launchers(pkg: Path, alvo: dict) -> None:
     )
     (pkg / "INICIAR PIRAXIS.bat").write_text(bat, encoding="utf-8")
 
+    # Autoteste offline (suporte de laboratório): diagnóstico em segundos,
+    # sem abrir o app — pega extração truncada (MAX_PATH) e afins.
+    verificar = (
+        "@echo off\r\n"
+        "chcp 65001 >nul\r\n"
+        'cd /d "%~dp0Programa"\r\n'
+        '"%~dp0python\\python.exe" autoteste.py\r\n'
+        "echo.\r\n"
+        "echo Pressione uma tecla para fechar.\r\n"
+        "pause >nul\r\n"
+    )
+    (pkg / "VERIFICAR INSTALACAO.bat").write_text(verificar, encoding="utf-8")
+
     command = (
         "#!/bin/bash\n"
         '# Launcher de PACOTE (runtime embutido) — nao cria venv, nao chama pip.\n'
@@ -364,10 +385,19 @@ def validar(py: Path, pkg: Path) -> list[str]:
     return rel
 
 
+def _porta_livre() -> int:
+    """Pede uma porta TCP livre ao SO (a fixa 8599 podia colidir)."""
+    import socket
+
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
 def _validar_boot(py: Path, pkg: Path) -> str:
     import urllib.error
 
-    porta = 8599
+    porta = _porta_livre()
     prog = pkg / "Programa"
     proc = subprocess.Popen(
         [str(py), "-m", "streamlit", "run", "app/streamlit_app.py",
@@ -411,8 +441,10 @@ def versao_do_repo() -> str:
     return f"{sha}-{iso}" if sha else iso
 
 
-def zipar(pkg: Path, versao: str, alvo_nome: str) -> tuple[Path, Path]:
-    """Gera o zip COMPLETO (1º install) e o zip SÓ-CÓDIGO (update leve).
+def zipar(
+    pkg: Path, versao: str, alvo_nome: str, com_updater: bool = False
+) -> tuple[Path, Path | None]:
+    """Gera o zip COMPLETO (e, com ``com_updater``, o zip SÓ-CÓDIGO).
 
     O zip completo tem o CONTEÚDO do pacote na RAIZ (python/, Programa/ e o
     launcher lado a lado) — mesma estrutura do artefato do CI, que foi a
@@ -422,8 +454,12 @@ def zipar(pkg: Path, versao: str, alvo_nome: str) -> tuple[Path, Path]:
     """
     completo = DIST / f"PIRAXIS-{versao}-{alvo_nome}"
     shutil.make_archive(str(completo), "zip", root_dir=str(pkg))
+    if not com_updater:
+        # Decisão do pesquisador: a versão COMPLETA é a base; o canal de
+        # auto-update está desligado — não gerar artefatos sem consumidor.
+        return Path(str(completo) + ".zip"), None
 
-    # Só-código: zip de Programa/ sem python/.
+    # Só-código: zip de Programa/ sem python/ (canal de update leve).
     tmp = DIST / "_codigo"
     if tmp.exists():
         shutil.rmtree(tmp)
@@ -454,6 +490,9 @@ def main() -> int:
                     help=f"plataforma alvo (padrão: {ALVO_PADRAO})")
     ap.add_argument("--locked", action="store_true",
                     help="instala a partir do requirements.lock (rebuild reprodutível)")
+    ap.add_argument("--com-updater", action="store_true",
+                    help="gera também o zip só-código e o manifesto.json (canal "
+                         "de auto-update — hoje sem consumidor; padrão: não gera)")
     args = ap.parse_args()
 
     _config_log()
@@ -504,8 +543,10 @@ def main() -> int:
         + "pip check pós-remoção das deps de teste"
     )
 
-    zip_completo, zip_codigo = zipar(pkg, versao, args.alvo)
-    manifesto = escrever_manifesto(versao, lock)
+    zip_completo, zip_codigo = zipar(
+        pkg, versao, args.alvo, com_updater=args.com_updater
+    )
+    manifesto = escrever_manifesto(versao, lock) if args.com_updater else None
 
     falhou = any(linha.startswith("FALHA") for linha in relatorio)
 
@@ -518,8 +559,11 @@ def main() -> int:
              PBS_RELEASE, args.alvo)
     log.info("Pacote: %s", pkg)
     log.info("Zip completo: %s (%s)", zip_completo.name, _mb(zip_completo))
-    log.info("Zip só-código: %s (%s)", zip_codigo.name, _mb(zip_codigo))
-    log.info("Manifesto: %s", manifesto)
+    if zip_codigo is not None:
+        log.info("Zip só-código: %s (%s)", zip_codigo.name, _mb(zip_codigo))
+        log.info("Manifesto: %s", manifesto)
+    else:
+        log.info("Zip só-código/manifesto: não gerados (use --com-updater)")
     log.info("Lock: %s", lock)
     log.info("Validação:")
     for linha in relatorio:

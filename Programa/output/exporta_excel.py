@@ -221,12 +221,16 @@ def exporta(
     n_dias = 1
     if "timestamp" in df.columns and df["timestamp"].notna().any():
         ts = df["timestamp"].dropna()
+        inicio = ts.min().normalize()
         fim = ts.max().normalize()
         if passo == "1M":
-            # No passo mensal o timestamp marca o INÍCIO do mês; o período
-            # coberto vai até o fim do último mês.
+            # A pvlib rotula o dado mensal no ÚLTIMO dia do mês (não no
+            # início — verificado no código da pvlib 0.15.2). O período
+            # coberto vai do dia 1º do primeiro mês ao fim do último; usar o
+            # rótulo cru subcontava ~9% (12 meses viravam ~335 dias).
+            inicio = inicio.replace(day=1)
             fim = fim + pd.offsets.MonthEnd(0)
-        n_dias = max(1, (fim - ts.min().normalize()).days + 1)
+        n_dias = max(1, (fim - inicio).days + 1)
 
     # FIDELIDADE À FONTE: extração SÓ-NASA usa a convenção da NASA POWER
     # (instante único, "Data/Hora"); com o CAMS presente, a faixa início–fim
