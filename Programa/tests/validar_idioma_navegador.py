@@ -7,7 +7,7 @@ import time
 import urllib.request
 from pathlib import Path
 
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import expect, sync_playwright
 
 RAIZ = Path(__file__).resolve().parent.parent
 
@@ -41,16 +41,16 @@ def main() -> None:
             navegador = p.chromium.launch()
             pagina = navegador.new_page(locale="pt-BR")
             pagina.goto(url)
-            pagina.locator("html[lang='pt-BR'][translate='no'].notranslate").wait_for()
+            pagina.locator("html[lang='pt-BR'][translate='no'].notranslate").wait_for(state="attached")
             assert pagina.locator('meta[name="google"]').get_attribute("content") == "notranslate"
             pagina.get_by_role("tab", name="Dados", exact=True).wait_for()
-            assert pagina.get_by_role("tab").all_text_contents() == [
+            expect(pagina.get_by_role("tab")).to_have_text([
                 "Painel", "Série temporal", "Conferência", "Dados",
-            ]
-            pagina.get_by_role("radio", name="Período", exact=True).check()
+            ])
+            pagina.get_by_role("radiogroup").get_by_text("Período", exact=True).click()
             pagina.get_by_text("Até", exact=True).wait_for()
-            labels = pagina.locator('[data-testid="stDateInput"] label').all_text_contents()
-            assert labels == ["De", "Até"], labels
+            expect(pagina.locator('[data-testid="stDateInput"] label')).to_have_text(["De", "Até"])
+            pagina.get_by_text("Até", exact=True).scroll_into_view_if_needed()
             # Re-renderizar widgets não deve remover a proteção do documento.
             assert pagina.locator("html").get_attribute("translate") == "no"
             assert pagina.get_by_text("Comeu", exact=True).count() == 0
