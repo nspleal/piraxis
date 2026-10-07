@@ -1,134 +1,71 @@
-name: Empacotar PIRAXIS (Windows portátil)
+name: Empacotar PIRAXIS 1.1 (Windows separado)
 
-# Gera o PACOTE PORTÁTIL de Windows (Python embutido) numa máquina Windows da
-# própria GitHub. Ninguém precisa instalar Python — nem para gerar, nem para
-# rodar. O resultado fica em DOIS lugares, com a MESMA estrutura interna
-# (python/, Programa/ e o INICIAR PIRAXIS.bat na raiz do zip — camada única):
-#
-#   1. RELEASE "pacote-windows" (PERMANENTE, link fixo, NÃO expira)  <-- use este
-#      Página: .../releases/tag/pacote-windows
-#      Download direto: .../releases/download/pacote-windows/PIRAXIS-windows-x64.zip
-#      Cada execução ATUALIZA a Release existente (troca o asset), sem apagar
-#      antes — assim o link nunca fica fora do ar se um build falhar no meio.
-#
-#   2. ARTEFATO "PIRAXIS-windows-x64" (cópia da build, expira em 90 dias).
-#
-# Como ATUALIZAR (para um novo teste no laboratório), pelo navegador:
-#   Aba "Actions" -> "Empacotar PIRAXIS (Windows portátil)" -> "Run workflow".
-#   Em minutos a Release aponta para a versão nova (mesmo link de sempre).
-#
-# Reprodutibilidade: por padrão o build instala EXATAMENTE as versões do
-# Programa/requirements.lock (--locked) — dois builds em datas diferentes
-# geram o mesmo ambiente. Para ATUALIZAR as dependências de propósito, marque
-# a opção "Atualizar dependências" ao disparar: o build resolve o
-# requirements.txt de novo e publica o requirements.lock regenerado como
-# artefato ("requirements-lock-novo") para ser commitado no repositório.
-#
-# Como USAR na máquina de destino (sem Python): baixe PIRAXIS-windows-x64.zip,
-# extraia em um caminho CURTO (ex.: C:\PIRAXIS) e dê dois cliques em
-# INICIAR PIRAXIS.bat. O caminho curto evita o limite de 260 caracteres do
-# Windows (que faz o descompactador pular arquivos sem avisar).
-
+# Este workflow só existe na branch 1.1. Nunca atualiza pacote-windows.
 on:
+  push:
+    branches: ["piraxis-1.1-interface"]
   workflow_dispatch:
-    inputs:
-      atualizar_dependencias:
-        description: "Atualizar dependências (re-resolver o requirements.txt e regravar o lock)?"
-        type: boolean
-        default: false
 
-# Nunca dois builds mexendo na mesma Release ao mesmo tempo.
 concurrency:
-  group: empacotar-windows
+  group: piraxis-release-1.1
   cancel-in-progress: false
 
 permissions:
-  contents: write           # publicar/atualizar a Release e mover a tag rolante
+  contents: write
 
 jobs:
   build-windows:
+    if: github.ref == 'refs/heads/piraxis-1.1-interface'
     runs-on: windows-latest
     steps:
-      - name: Baixar o código do repositório
+      - name: Baixar a versão separada
         uses: actions/checkout@v4
 
-      - name: Preparar um Python para RODAR o build (só na nuvem)
+      - name: Preparar Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Gerar o pacote portátil (Windows x64) + validar
-        shell: bash
+      - name: Instalar dependências de validação
         run: |
-          if [ "${{ inputs.atualizar_dependencias }}" = "true" ]; then
-            # Atualização DELIBERADA: resolve o requirements.txt de novo.
-            python empacotar.py --alvo windows-x64
-          else
-            # Padrão: build reprodutível com as versões EXATAS do lock.
-            python empacotar.py --alvo windows-x64 --locked
-          fi
+          pip install -r Programa/requirements.lock -r Programa/requirements-dev.txt playwright
+          python -m playwright install chromium
 
-      - name: Guardar/atualizar a Release PERMANENTE "pacote-windows"
+      - name: Rodar testes e verificar interface no Chromium
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path dist -Force | Out-Null
+          Push-Location Programa
+          python -m pytest -q
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tests/validar_app.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tests/validar_idioma_navegador.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Pop-Location
+
+      - name: Gerar e validar o pacote Windows 1.1
+        run: python empacotar.py --alvo windows-x64 --locked --versao 1.1
+
+      - name: Criar uma release nova sem substituir a anterior
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          # Asset com nome ESTÁVEL (link sempre igual), a partir do zip completo do build.
-          ZIP_BUILD="$(ls dist/PIRAXIS-*-windows-x64.zip | head -n1)"
-          cp "$ZIP_BUILD" "dist/PIRAXIS-windows-x64.zip"
-
-          # Soma de verificação publicada junto (integridade verificável do
-          # download — rastreabilidade p/ INPI). Conferir no Windows com:
-          #   certutil -hashfile PIRAXIS-windows-x64.zip SHA256
-          (cd dist && sha256sum PIRAXIS-windows-x64.zip > SHA256SUMS.txt)
-          cat dist/SHA256SUMS.txt
-
-          SHA_SHORT="${GITHUB_SHA::7}"
+          ZIP_BUILD="$(ls dist/PIRAXIS-1.1-*-windows-x64.zip | head -n1)"
+          cp "$ZIP_BUILD" dist/PIRAXIS-1.1-windows-x64.zip
+          (cd dist && sha256sum PIRAXIS-1.1-windows-x64.zip > SHA256SUMS-1.1.txt)
           printf '%s\n\n%s\n\n%s\n\n%s\n' \
-            "Pacote portátil do PIRAXIS para Windows — Python embutido, NÃO precisa instalar nada." \
-            "Build automático do commit ${SHA_SHORT}." \
-            "Como usar: baixe PIRAXIS-windows-x64.zip, extraia em um caminho CURTO (exemplo: C:\\PIRAXIS) e dê dois cliques em INICIAR PIRAXIS.bat. Em caso de dúvida, rode VERIFICAR INSTALACAO.bat (autoteste offline)." \
-            "Integridade: confira o SHA256 do zip contra o SHA256SUMS.txt (no Windows: certutil -hashfile PIRAXIS-windows-x64.zip SHA256)." \
-            > dist/release-notes.md
-
-          TITULO="PIRAXIS — pacote Windows (mais recente)"
-          if gh release view pacote-windows >/dev/null 2>&1; then
-            # ATUALIZA a Release existente — sem apagar antes, sem janela de 404.
-            gh release upload pacote-windows \
-              "dist/PIRAXIS-windows-x64.zip" "dist/SHA256SUMS.txt" --clobber
-            gh release edit pacote-windows --title "$TITULO" \
-              --notes-file dist/release-notes.md --latest
-            # Move a tag ROLANTE para o commit atual (ponteiro de release, não
-            # reescrita de histórico — é o padrão de "rolling release").
-            git push --force origin "HEAD:refs/tags/pacote-windows"
-          else
-            gh release create pacote-windows \
-              "dist/PIRAXIS-windows-x64.zip" "dist/SHA256SUMS.txt" \
-              --title "$TITULO" \
-              --notes-file dist/release-notes.md \
-              --latest \
-              --target "$GITHUB_SHA"
-          fi
-
-      - name: Anexar o pacote COMPLETO também como artefato (cópia da build)
-        uses: actions/upload-artifact@v4
-        with:
-          name: PIRAXIS-windows-x64
-          # Sobe a PASTA do pacote -> download em camada única (igual à Release).
-          path: dist/PIRAXIS
-          if-no-files-found: error
-          retention-days: 90
-          compression-level: 6
-          # Sem isto o v4 EXCLUI arquivos/pastas ocultos — perderíamos o
-          # Programa/.streamlit/config.toml (tema escuro) e o .env.example.
-          include-hidden-files: true
-
-      - name: Publicar o requirements.lock regenerado (p/ commitar no repo)
-        if: ${{ inputs.atualizar_dependencias }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: requirements-lock-novo
-          path: Programa/requirements.lock
-          if-no-files-found: error
-          retention-days: 30
+            "PIRAXIS 1.1 — pacote Windows separado, Python embutido." \
+            "Commit: ${GITHUB_SHA}. Rótulos originais protegidos contra tradução automática." \
+            "Extraia em C:\\PIRAXIS-1.1 e abra INICIAR PIRAXIS.bat. Preserve a pasta da versão anterior." \
+            "A release pacote-windows e a branch original não foram alteradas." \
+            > dist/release-notes-1.1.md
+          # create falha se v1.1 já existir: nenhum clobber, edit ou force-push.
+          gh release create v1.1 \
+            dist/PIRAXIS-1.1-windows-x64.zip dist/SHA256SUMS-1.1.txt \
+            dist/interface-1.1.png \
+            --title "PIRAXIS 1.1 — Windows" \
+            --notes-file dist/release-notes-1.1.md \
+            --target "$GITHUB_SHA" --latest=false

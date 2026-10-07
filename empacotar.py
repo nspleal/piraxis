@@ -490,6 +490,8 @@ def main() -> int:
                     help=f"plataforma alvo (padrão: {ALVO_PADRAO})")
     ap.add_argument("--locked", action="store_true",
                     help="instala a partir do requirements.lock (rebuild reprodutível)")
+    ap.add_argument("--versao", choices=["1.1"],
+                    help="identifica a versão 1.1, preservando commit e data do build")
     ap.add_argument("--com-updater", action="store_true",
                     help="gera também o zip só-código e o manifesto.json (canal "
                          "de auto-update — hoje sem consumidor; padrão: não gera)")
@@ -524,6 +526,8 @@ def main() -> int:
     lock = congelar_lock(py)
 
     versao = versao_do_repo()
+    if args.versao:
+        versao = f"{args.versao}-{versao}"
     copiar_codigo(pkg, versao)
     gerar_launchers(pkg, alvo)
     escrever_leiame_raiz(pkg)

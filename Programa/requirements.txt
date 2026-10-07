@@ -2,7 +2,7 @@
 # Instale com:  pip install -r requirements.txt
 # SÓ dependências de PRODUÇÃO — é isto que vai dentro do pacote portátil.
 # Ferramentas de desenvolvimento/teste ficam em requirements-dev.txt.
-streamlit>=1.30
+streamlit>=1.58
 pandas>=2.0
 requests>=2.31
 openpyxl>=3.1

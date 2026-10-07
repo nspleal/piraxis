@@ -76,6 +76,33 @@ st.set_page_config(
     layout="wide",
 )
 
+# A página do Streamlit nasce em inglês. Sem indicar o idioma real, a tradução
+# automática pode trocar "Até" por "Comeu" e corromper os títulos das abas.
+# HTML/JS fixos do app; nenhum dado do usuário é interpolado aqui.
+st.html(
+    """
+    <span id="piraxis-idioma" hidden></span>
+    <style>
+    [data-testid="stElementContainer"]:has(#piraxis-idioma) { display: none; }
+    </style>
+    <script>
+    (() => {
+    document.documentElement.lang = "pt-BR";
+    document.documentElement.setAttribute("translate", "no");
+    document.documentElement.classList.add("notranslate");
+    let meta = document.querySelector('meta[name="google"]');
+    if (!meta) {
+        meta = document.createElement("meta");
+        meta.name = "google";
+        document.head.appendChild(meta);
+    }
+    meta.content = "notranslate";
+    })();
+    </script>
+    """,
+    unsafe_allow_javascript=True,
+)
+
 # ---------------------------------------------------------------------------
 # Paleta da identidade visual (tema escuro) e ativos
 # ---------------------------------------------------------------------------
