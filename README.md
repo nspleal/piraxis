@@ -9,16 +9,20 @@ e **NASA POWER** (céu real). Nome: *piranômetro* + *axis*.
 > convenção de rótulo, unidades e precisão do download oficial (comprovável pela
 > aba de Conferência, que compara linha a linha com o CSV do site).
 
-## Para usar (Windows, sem instalar nada)
+## Para usar a versão 1.1 (Windows, sem instalar nada)
 
-1. Baixe o pacote portátil (Python embutido) na Release fixa:
-   **[`PIRAXIS-windows-x64.zip`](../../releases/download/pacote-windows/PIRAXIS-windows-x64.zip)**
-2. Extraia em um caminho **curto** (ex.: `C:\PIRAXIS`) — o limite de 260
-   caracteres do Windows corta arquivos silenciosamente em caminhos fundos.
-3. Dois cliques em **`INICIAR PIRAXIS.bat`**. Abre no navegador, offline no 1º uso.
+1. O build da branch `piraxis-1.1-interface` publica o pacote separado na
+   **[Release 1.1](../../releases/tag/v1.1)** após passar nas verificações.
+2. Baixe `PIRAXIS-1.1-windows-x64.zip` e extraia em um caminho curto e novo,
+   por exemplo `C:\PIRAXIS-1.1`, preservando a pasta da versão anterior.
+3. Dois cliques em **`INICIAR PIRAXIS.bat`**. O Python já está embutido.
+   Use `VERIFICAR INSTALACAO.bat` para o autoteste offline.
 
-Para gerar um pacote novo: aba **Actions** → *"Empacotar PIRAXIS (Windows portátil)"*
-→ **Run workflow** (a Release acima é atualizada no mesmo link).
+A versão anterior continua disponível no mesmo link:
+**[`PIRAXIS-windows-x64.zip`](../../releases/download/pacote-windows/PIRAXIS-windows-x64.zip)**.
+O workflow desta branch cria exclusivamente a release `v1.1` e falha se ela já
+existir. Detalhes de preservação, diagnóstico e verificação em
+[`VERSAO-1.1.md`](VERSAO-1.1.md).
 
 ## Para desenvolver
 
