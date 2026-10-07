@@ -13,6 +13,9 @@ concurrency:
 permissions:
   contents: write
 
+env:
+  PYTHONUTF8: "1"
+
 jobs:
   build-windows:
     if: github.ref == 'refs/heads/piraxis-1.1-interface'
